@@ -2,99 +2,112 @@ package com.loja.movapp.controller;
 
 import com.loja.movapp.dto.ProdutoRequestDTO;
 import com.loja.movapp.dto.ProdutoResponseDTO;
-import com.loja.movapp.model.Produto;
 import com.loja.movapp.service.ProdutoService;
-
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
 
+/**
+ * Controller de Produto.
+ * Responsável apenas por receber requisições e devolver respostas.
+ * Toda lógica e validação fica no ProdutoService!
+ */
 @RestController
 @RequestMapping("/produtos")
+@Tag(name = "Produtos", description = "Endpoints para gerenciamento de produtos")
 public class ProdutoController {
 
     @Autowired
     private ProdutoService service;
 
     @PostMapping
+    @Operation(summary = "Cadastrar produto")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Produto cadastrado"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos")
+    })
     public ResponseEntity<?> cadastrar(@Valid @RequestBody ProdutoRequestDTO dto) {
 
         if (service.existeCodigo(dto.getCodigo())) {
             return ResponseEntity.badRequest()
-                    .body("Código \"" + dto.getCodigo() + "\" já cadastrado!");
+                    .body("⚠ Código \"" + dto.getCodigo() + "\" já cadastrado!");
         }
 
         ProdutoResponseDTO salvo = service.salvar(dto);
-
-        // Retorna 201 Created
         return ResponseEntity
                 .created(URI.create("/produtos/" + salvo.getCodigo()))
                 .body(salvo);
     }
 
     @GetMapping
+    @Operation(summary = "Listar produtos paginado")
     public ResponseEntity<Page<ProdutoResponseDTO>> listar(Pageable pageable) {
         return ResponseEntity.ok(service.listarPaginado(pageable));
     }
 
     @GetMapping("/{codigo}")
-    public ResponseEntity<ProdutoResponseDTO> buscar(@PathVariable String codigo) {
+    @Operation(summary = "Buscar por código")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Produto encontrado"),
+            @ApiResponse(responseCode = "404", description = "Não encontrado")
+    })
+    public ResponseEntity<ProdutoResponseDTO> buscar(
+            @Parameter(description = "Código do produto")
+            @PathVariable String codigo) {
         return service.buscarPorCodigo(codigo)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PutMapping("/{codigo}")
-    public ResponseEntity<?> editar(@PathVariable String codigo,
-                                    @Valid @RequestBody ProdutoRequestDTO dto) {
+    @Operation(summary = "Editar produto")
+    public ResponseEntity<?> editar(
+            @PathVariable String codigo,
+            @Valid @RequestBody ProdutoRequestDTO dto) {
 
         if (!service.existeCodigo(codigo)) {
             return ResponseEntity.badRequest()
                     .body("Produto com código " + codigo + " não encontrado!");
         }
 
-        ProdutoResponseDTO atualizado = service.editar(codigo, dto);
-        return ResponseEntity.ok(atualizado);
+        return ResponseEntity.ok(service.editar(codigo, dto));
     }
 
     @DeleteMapping("/{codigo}")
-    public ResponseEntity<?> excluir(@PathVariable String codigo) {
+    @Operation(summary = "Excluir produto")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Excluído com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Produto com estoque")
+    })
+    public ResponseEntity<?> excluir(
+            @Parameter(description = "Código do produto")
+            @PathVariable String codigo) {
 
         if (!service.existeCodigo(codigo)) {
             return ResponseEntity.badRequest()
-                    .body("Produto não encontrado!");
-        }
-
-        Produto p = service.buscarEntity(codigo)
-                .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
-
-        if (p.getEstoque() > 0) {
-            return ResponseEntity.badRequest()
-                    .body("Produto com estoque não pode ser excluído! Estoque: " + p.getEstoque());
+                    .body("⚠ Produto não encontrado!");
         }
 
         service.excluir(codigo);
-
-        // 204 No Content (mais profissional)
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/preco")
+    @Operation(summary = "Buscar por faixa de preço")
     public ResponseEntity<?> buscarPorFaixaDePreco(
-            @RequestParam double min,
-            @RequestParam double max) {
-
-        if (min < 0 || max < 0 || min > max) {
-            return ResponseEntity.badRequest()
-                    .body("Valores inválidos para faixa de preço");
-        }
+            @Parameter(description = "Preço mínimo") @RequestParam double min,
+            @Parameter(description = "Preço máximo") @RequestParam double max) {
 
         List<ProdutoResponseDTO> produtos = service.buscarPorFaixaDePreco(min, max);
 
