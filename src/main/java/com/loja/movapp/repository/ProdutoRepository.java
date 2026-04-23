@@ -18,7 +18,18 @@ public interface ProdutoRepository  extends JpaRepository <Produto, String>{
                                         @Param("max") double max);
 
     Page<Produto> findAll(Pageable pageable);
+
+    Page<Produto> findByNomeContainingIgnoreCase(String nome, Pageable pageable);
+
+    @Query("SELECT p FROM Produto p WHERE p.preco >= :min AND p.preco <= :max")
+    Page<Produto> buscarPorFaixaDePreco(
+            @Param("min") double min,
+            @Param("max") double max,
+            Pageable pageable
+    );
 }
+
+
 
 
 

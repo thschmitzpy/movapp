@@ -51,8 +51,14 @@ public class ProdutoController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar produtos paginado")
-    public ResponseEntity<Page<ProdutoResponseDTO>> listar(Pageable pageable) {
+    @Operation(summary = "Listar produtos paginado", description = "Filtra por nome quando o parâmetro 'nome' é informado")
+    public ResponseEntity<Page<ProdutoResponseDTO>> listar(
+            @Parameter(description = "Filtro parcial por nome (opcional)")
+            @RequestParam(required = false) String nome,
+            Pageable pageable) {
+        if (nome != null && !nome.isBlank()) {
+            return ResponseEntity.ok(service.listarPorNome(nome, pageable));
+        }
         return ResponseEntity.ok(service.listarPaginado(pageable));
     }
 
@@ -104,12 +110,15 @@ public class ProdutoController {
     }
 
     @GetMapping("/preco")
-    @Operation(summary = "Buscar por faixa de preço")
+    @Operation(summary = "Buscar por faixa de preço",
+            description = "Retorna produtos entre o preço mínimo e máximo com paginação")
     public ResponseEntity<?> buscarPorFaixaDePreco(
             @Parameter(description = "Preço mínimo") @RequestParam double min,
-            @Parameter(description = "Preço máximo") @RequestParam double max) {
+            @Parameter(description = "Preço máximo") @RequestParam double max,
+            Pageable pageable) {                             // ✅ adicionou Pageable
 
-        List<ProdutoResponseDTO> produtos = service.buscarPorFaixaDePreco(min, max);
+        Page<ProdutoResponseDTO> produtos =
+                service.buscarPorFaixaDePreco(min, max, pageable);
 
         if (produtos.isEmpty()) {
             return ResponseEntity.noContent().build();

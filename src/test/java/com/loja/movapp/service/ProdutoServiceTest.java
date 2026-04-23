@@ -10,6 +10,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -29,10 +33,8 @@ class ProdutoServiceTest {
     private Produto produto;
     private ProdutoRequestDTO requestDTO;
 
-
     @BeforeEach
     void setUp() {
-
         produto = new Produto();
         produto.setCodigo("001");
         produto.setNome("Camiseta");
@@ -48,7 +50,6 @@ class ProdutoServiceTest {
         requestDTO.setTamanho("M");
         requestDTO.setPreco(29.90);
         requestDTO.setEstoque(50);
-
     }
 
     @Test
@@ -61,10 +62,9 @@ class ProdutoServiceTest {
         assertEquals("001", resultado.getCodigo());
         assertEquals("Camiseta", resultado.getNome());
         verify(repository, times(1)).save(any(Produto.class));
-
     }
 
- @Test
+    @Test
     void deveBuscarProdutoPorCodigoExistente() {
         when(repository.findById("001")).thenReturn(Optional.of(produto));
 
@@ -72,30 +72,31 @@ class ProdutoServiceTest {
 
         assertTrue(resultado.isPresent());
         assertEquals("Camiseta", resultado.get().getNome());
- }
+    }
 
- @Test
+    @Test
     void deveRetornarVazioQuandoCodigoNaoExiste() {
         when(repository.findById("999")).thenReturn(Optional.empty());
 
         Optional<ProdutoResponseDTO> resultado = service.buscarPorCodigo("999");
 
-        assertFalse(service.existeCodigo("999"));
- }
+        assertFalse(resultado.isPresent());
+    }
 
- @Test
-    void deveRetornarTrueQuandoCodigoExiste(){
-     when(repository.existsById("001")).thenReturn(true);
+    @Test
+    void deveRetornarTrueQuandoCodigoExiste() {
+        when(repository.existsById("001")).thenReturn(true);
 
-     assertTrue(service.existeCodigo("001"));
- }
+        assertTrue(service.existeCodigo("001"));
+    }
 
- @Test
-    void deveRetornarFalseQuandoCodigoNaoExiste(){
+    @Test
+    void deveRetornarFalseQuandoCodigoNaoExiste() {
         when(repository.existsById("999")).thenReturn(false);
 
         assertFalse(service.existeCodigo("999"));
- }
+    }
+
     @Test
     void deveExcluirProdutoComEstoqueZero() {
         produto.setEstoque(0);
@@ -117,6 +118,7 @@ class ProdutoServiceTest {
         assertTrue(ex.getMessage().contains("não pode ser excluído"));
         verify(repository, never()).deleteById(any());
     }
+
     @Test
     void deveLancarExcecaoAoExcluirProdutoInexistente() {
         when(repository.findById("999")).thenReturn(Optional.empty());
@@ -126,28 +128,41 @@ class ProdutoServiceTest {
 
         assertTrue(ex.getMessage().contains("não encontrado"));
     }
+
     @Test
     void deveBuscarPorFaixaDePrecoValida() {
-        when(repository.buscarPorFaixaDePreco(10.0, 50.0))
-                .thenReturn(List.of(produto));
 
-        List<ProdutoResponseDTO> resultado = service.buscarPorFaixaDePreco(10.0, 50.0);
+        //cria um Pageable e um Page para o mock
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Produto> page = new PageImpl<>(List.of(produto));
+
+        when(repository.buscarPorFaixaDePreco(10.0, 50.0, pageable))
+                .thenReturn(page);
+
+
+        Page<ProdutoResponseDTO> resultado =
+                service.buscarPorFaixaDePreco(10.0, 50.0, pageable);
 
         assertFalse(resultado.isEmpty());
-        assertEquals(1, resultado.size());
+        assertEquals(1, resultado.getTotalElements());
     }
+
     @Test
     void deveLancarExcecaoQuandoPrecoMinMaiorQueMax() {
+        Pageable pageable = PageRequest.of(0, 10);
+
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.buscarPorFaixaDePreco(100.0, 10.0));
+                () -> service.buscarPorFaixaDePreco(100.0, 10.0, pageable));
 
         assertTrue(ex.getMessage().contains("mínimo não pode ser maior"));
     }
 
     @Test
     void deveLancarExcecaoQuandoPrecoNegativo() {
+        Pageable pageable = PageRequest.of(0, 10);
+
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.buscarPorFaixaDePreco(-10.0, 50.0));
+                () -> service.buscarPorFaixaDePreco(-10.0, 50.0, pageable));
 
         assertTrue(ex.getMessage().contains("não podem ser negativos"));
     }
@@ -176,5 +191,4 @@ class ProdutoServiceTest {
 
         assertTrue(ex.getMessage().contains("não encontrado"));
     }
-
 }

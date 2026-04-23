@@ -5,6 +5,11 @@ import com.loja.movapp.dto.ProdutoResponseDTO;
 import com.loja.movapp.model.Produto;
 import com.loja.movapp.repository.ProdutoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,7 +19,7 @@ import java.util.stream.Collectors;
 /**
  * Service de Produto.
  * Responsável por todas as regras de negócio dos produtos.
- * Nenhuma validação deve estar fora daqui
+ * Nenhuma validação deve estar fora daqui!
  */
 @Service
 public class ProdutoService {
@@ -33,7 +38,6 @@ public class ProdutoService {
         return p;
     }
 
-    // ── conversão Entidade → DTO ─────────────────────
     private ProdutoResponseDTO toDTO(Produto p) {
         return new ProdutoResponseDTO(
                 p.getCodigo(), p.getNome(), p.getCor(),
@@ -41,28 +45,34 @@ public class ProdutoService {
         );
     }
 
+
+    @CachePut(value = "produtos", key = "#result.codigo")
     public ProdutoResponseDTO salvar(ProdutoRequestDTO dto) {
         return toDTO(repository.save(toEntity(dto)));
     }
 
-    public org.springframework.data.domain.Page<ProdutoResponseDTO> listarPaginado(
-            org.springframework.data.domain.Pageable pageable) {
+
+    public Page<ProdutoResponseDTO> listarPaginado(Pageable pageable) {
         return repository.findAll(pageable).map(this::toDTO);
     }
 
+    public Page<ProdutoResponseDTO> listarPorNome(String nome, Pageable pageable) {
+        return repository.findByNomeContainingIgnoreCase(nome, pageable).map(this::toDTO);
+    }
+
+
+    @Cacheable(value = "produtos", key = "#codigo")
     public Optional<ProdutoResponseDTO> buscarPorCodigo(String codigo) {
         return repository.findById(codigo).map(this::toDTO);
     }
+
 
     public boolean existeCodigo(String codigo) {
         return repository.existsById(codigo);
     }
 
-    // ── excluir com validação
-    /**
-     * Exclui o produto pelo código.
-     * Regra: não pode excluir se tiver estoque maior que zero.
-     */
+
+    @CacheEvict(value = "produtos", key = "#codigo")
     public void excluir(String codigo) {
 
         Produto p = repository.findById(codigo)
@@ -78,12 +88,19 @@ public class ProdutoService {
         repository.deleteById(codigo);
     }
 
-    public List<ProdutoResponseDTO> buscarPorFaixaDePreco(double min, double max) {
 
+
+    // ── buscar por faixa de preço ────────────────────
+    /**
+     * Busca produtos entre o preço mínimo e máximo COM paginação.
+     * Regra: min não pode ser maior que max e ambos não podem ser negativos.
+     */
+    public Page<ProdutoResponseDTO> buscarPorFaixaDePreco(
+                                                             double min, double max, Pageable pageable) {
 
         if (min < 0 || max < 0) {
             throw new IllegalArgumentException(
-                    " Os valores de preço não podem ser negativos!");
+                    "Os valores de preço não podem ser negativos!");
         }
 
         if (min > max) {
@@ -91,22 +108,27 @@ public class ProdutoService {
                     "O preço mínimo não pode ser maior que o máximo!");
         }
 
-        return repository.buscarPorFaixaDePreco(min, max)
-                .stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
+        return repository.buscarPorFaixaDePreco(min, max, pageable)
+                .map(this::toDTO);
     }
 
+
+    /**
+     * Edita o produto e atualiza o cache.
+     * Só atualiza os campos que vieram preenchidos.
+     */
+    @CachePut(value = "produtos", key = "#codigo")
     public ProdutoResponseDTO editar(String codigo, ProdutoRequestDTO dto) {
+
         Produto p = repository.findById(codigo)
                 .orElseThrow(() -> new RuntimeException(
                         "Produto com código " + codigo + " não encontrado!"));
 
-        if (dto.getNome()      != null) p.setNome(dto.getNome());
-        if (dto.getCor()       != null) p.setCor(dto.getCor());
-        if (dto.getTamanho()   != null) p.setTamanho(dto.getTamanho());
-        if (dto.getPreco()     >  0)    p.setPreco(dto.getPreco());
-        if (dto.getEstoque()   >= 0)    p.setEstoque(dto.getEstoque());
+        if (dto.getNome()    != null) p.setNome(dto.getNome());
+        if (dto.getCor()     != null) p.setCor(dto.getCor());
+        if (dto.getTamanho() != null) p.setTamanho(dto.getTamanho());
+        if (dto.getPreco()   >  0)    p.setPreco(dto.getPreco());
+        if (dto.getEstoque() >= 0)    p.setEstoque(dto.getEstoque());
 
         return toDTO(repository.save(p));
     }
