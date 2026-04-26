@@ -1,6 +1,7 @@
 package com.loja.movapp.config;
 
 import com.loja.movapp.security.JwtAuthenticationFilter;
+import com.loja.movapp.security.LoginRateLimitFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -30,6 +31,9 @@ public class SecurityConfig {
 
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Autowired
+    private LoginRateLimitFilter loginRateLimitFilter;
 
     @Value("${app.admin.username}")
     private String adminUsername;
@@ -84,6 +88,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,    "/produtos/**").hasAnyRole("ADMIN", "USER")
                         .anyRequest().authenticated()
                 )
+                .addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

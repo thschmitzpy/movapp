@@ -16,13 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
-import java.util.List;
 
-/**
- * Controller de Produto.
- * Responsável apenas por receber requisições e devolver respostas.
- * Toda lógica e validação fica no ProdutoService!
- */
 @RestController
 @RequestMapping("/produtos")
 @Tag(name = "Produtos", description = "Endpoints para gerenciamento de produtos")
@@ -35,15 +29,10 @@ public class ProdutoController {
     @Operation(summary = "Cadastrar produto")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Produto cadastrado"),
-            @ApiResponse(responseCode = "400", description = "Dados inválidos")
+            @ApiResponse(responseCode = "400", description = "Dados inválidos"),
+            @ApiResponse(responseCode = "409", description = "Código já cadastrado")
     })
-    public ResponseEntity<?> cadastrar(@Valid @RequestBody ProdutoRequestDTO dto) {
-
-        if (service.existeCodigo(dto.getCodigo())) {
-            return ResponseEntity.badRequest()
-                    .body("⚠ Código \"" + dto.getCodigo() + "\" já cadastrado!");
-        }
-
+    public ResponseEntity<ProdutoResponseDTO> cadastrar(@Valid @RequestBody ProdutoRequestDTO dto) {
         ProdutoResponseDTO salvo = service.salvar(dto);
         return ResponseEntity
                 .created(URI.create("/produtos/" + salvo.getCodigo()))
@@ -71,22 +60,18 @@ public class ProdutoController {
     public ResponseEntity<ProdutoResponseDTO> buscar(
             @Parameter(description = "Código do produto")
             @PathVariable String codigo) {
-        return service.buscarPorCodigo(codigo)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return ResponseEntity.ok(service.buscarPorCodigo(codigo));
     }
 
     @PutMapping("/{codigo}")
     @Operation(summary = "Editar produto")
-    public ResponseEntity<?> editar(
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Produto atualizado"),
+            @ApiResponse(responseCode = "404", description = "Não encontrado")
+    })
+    public ResponseEntity<ProdutoResponseDTO> editar(
             @PathVariable String codigo,
             @Valid @RequestBody ProdutoRequestDTO dto) {
-
-        if (!service.existeCodigo(codigo)) {
-            return ResponseEntity.badRequest()
-                    .body("Produto com código " + codigo + " não encontrado!");
-        }
-
         return ResponseEntity.ok(service.editar(codigo, dto));
     }
 
@@ -94,17 +79,12 @@ public class ProdutoController {
     @Operation(summary = "Excluir produto")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Excluído com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Produto com estoque")
+            @ApiResponse(responseCode = "404", description = "Não encontrado"),
+            @ApiResponse(responseCode = "409", description = "Produto com estoque")
     })
-    public ResponseEntity<?> excluir(
+    public ResponseEntity<Void> excluir(
             @Parameter(description = "Código do produto")
             @PathVariable String codigo) {
-
-        if (!service.existeCodigo(codigo)) {
-            return ResponseEntity.badRequest()
-                    .body("Produto não encontrado!");
-        }
-
         service.excluir(codigo);
         return ResponseEntity.noContent().build();
     }
@@ -112,18 +92,14 @@ public class ProdutoController {
     @GetMapping("/preco")
     @Operation(summary = "Buscar por faixa de preço",
             description = "Retorna produtos entre o preço mínimo e máximo com paginação")
-    public ResponseEntity<?> buscarPorFaixaDePreco(
+    public ResponseEntity<Page<ProdutoResponseDTO>> buscarPorFaixaDePreco(
             @Parameter(description = "Preço mínimo") @RequestParam double min,
             @Parameter(description = "Preço máximo") @RequestParam double max,
             Pageable pageable) {
-
-        Page<ProdutoResponseDTO> produtos =
-                service.buscarPorFaixaDePreco(min, max, pageable);
-
+        Page<ProdutoResponseDTO> produtos = service.buscarPorFaixaDePreco(min, max, pageable);
         if (produtos.isEmpty()) {
             return ResponseEntity.noContent().build();
         }
-
         return ResponseEntity.ok(produtos);
     }
 }

@@ -15,8 +15,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.Optional;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ProdutoService {
@@ -44,32 +43,41 @@ public class ProdutoService {
         );
     }
 
+    @Transactional
     @CachePut(value = "produtos", key = "#result.codigo")
     public ProdutoResponseDTO salvar(ProdutoRequestDTO dto) {
+        if (repository.existsById(dto.getCodigo())) {
+            log.warn("Cadastro bloqueado: código '{}' já existe", dto.getCodigo());
+            throw new OperacaoNaoPermitidaException(
+                    "Código \"" + dto.getCodigo() + "\" já está cadastrado!");
+        }
         log.info("Cadastrando produto: codigo={}, nome={}", dto.getCodigo(), dto.getNome());
         ProdutoResponseDTO salvo = toDTO(repository.save(toEntity(dto)));
         log.info("Produto cadastrado com sucesso: codigo={}", salvo.getCodigo());
         return salvo;
     }
 
+    @Transactional(readOnly = true)
     public Page<ProdutoResponseDTO> listarPaginado(Pageable pageable) {
         return repository.findAll(pageable).map(this::toDTO);
     }
 
+    @Transactional(readOnly = true)
     public Page<ProdutoResponseDTO> listarPorNome(String nome, Pageable pageable) {
         log.info("Buscando produtos por nome: '{}'", nome);
         return repository.findByNomeContainingIgnoreCase(nome, pageable).map(this::toDTO);
     }
 
+    @Transactional(readOnly = true)
     @Cacheable(value = "produtos", key = "#codigo")
-    public Optional<ProdutoResponseDTO> buscarPorCodigo(String codigo) {
-        return repository.findById(codigo).map(this::toDTO);
+    public ProdutoResponseDTO buscarPorCodigo(String codigo) {
+        return repository.findById(codigo)
+                .map(this::toDTO)
+                .orElseThrow(() -> new RecursoNaoEncontradoException(
+                        "Produto com código \"" + codigo + "\" não encontrado!"));
     }
 
-    public boolean existeCodigo(String codigo) {
-        return repository.existsById(codigo);
-    }
-
+    @Transactional
     @CacheEvict(value = "produtos", key = "#codigo")
     public void excluir(String codigo) {
         Produto p = repository.findById(codigo)
@@ -90,6 +98,7 @@ public class ProdutoService {
         log.info("Produto excluído: codigo={}", codigo);
     }
 
+    @Transactional(readOnly = true)
     public Page<ProdutoResponseDTO> buscarPorFaixaDePreco(double min, double max, Pageable pageable) {
         if (min < 0 || max < 0) {
             throw new IllegalArgumentException("Os valores de preço não podem ser negativos!");
@@ -101,6 +110,7 @@ public class ProdutoService {
         return repository.buscarPorFaixaDePreco(min, max, pageable).map(this::toDTO);
     }
 
+    @Transactional
     @CachePut(value = "produtos", key = "#codigo")
     public ProdutoResponseDTO editar(String codigo, ProdutoRequestDTO dto) {
         Produto p = repository.findById(codigo)

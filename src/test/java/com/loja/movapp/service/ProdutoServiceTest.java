@@ -56,6 +56,7 @@ class ProdutoServiceTest {
 
     @Test
     void deveSalvarProdutoComSucesso() {
+        when(repository.existsById("001")).thenReturn(false);
         when(repository.save(any(Produto.class))).thenReturn(produto);
 
         ProdutoResponseDTO resultado = service.salvar(requestDTO);
@@ -67,36 +68,34 @@ class ProdutoServiceTest {
     }
 
     @Test
+    void deveLancarOperacaoNaoPermitidaAoCadastrarCodigoDuplicado() {
+        when(repository.existsById("001")).thenReturn(true);
+
+        OperacaoNaoPermitidaException ex = assertThrows(OperacaoNaoPermitidaException.class,
+                () -> service.salvar(requestDTO));
+
+        assertTrue(ex.getMessage().contains("já está cadastrado"));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void deveBuscarProdutoPorCodigoExistente() {
         when(repository.findById("001")).thenReturn(Optional.of(produto));
 
-        Optional<ProdutoResponseDTO> resultado = service.buscarPorCodigo("001");
+        ProdutoResponseDTO resultado = service.buscarPorCodigo("001");
 
-        assertTrue(resultado.isPresent());
-        assertEquals("Camiseta", resultado.get().getNome());
+        assertNotNull(resultado);
+        assertEquals("Camiseta", resultado.getNome());
     }
 
     @Test
-    void deveRetornarVazioQuandoCodigoNaoExiste() {
+    void deveLancarRecursoNaoEncontradoAoBuscarCodigoInexistente() {
         when(repository.findById("999")).thenReturn(Optional.empty());
 
-        Optional<ProdutoResponseDTO> resultado = service.buscarPorCodigo("999");
+        RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.buscarPorCodigo("999"));
 
-        assertFalse(resultado.isPresent());
-    }
-
-    @Test
-    void deveRetornarTrueQuandoCodigoExiste() {
-        when(repository.existsById("001")).thenReturn(true);
-
-        assertTrue(service.existeCodigo("001"));
-    }
-
-    @Test
-    void deveRetornarFalseQuandoCodigoNaoExiste() {
-        when(repository.existsById("999")).thenReturn(false);
-
-        assertFalse(service.existeCodigo("999"));
+        assertTrue(ex.getMessage().contains("não encontrado"));
     }
 
     @Test

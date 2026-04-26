@@ -3,8 +3,10 @@ package com.loja.movapp.controller;
 import com.loja.movapp.dto.LoginRequestDTO;
 import com.loja.movapp.dto.LoginResponseDTO;
 import com.loja.movapp.security.JwtUtil;
+import com.loja.movapp.security.TokenBlacklist;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +22,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Endpoints de autenticação: login (retorna o token JWT) e logout (invalida o token atual).
+ */
 @RestController
 @RequestMapping("/auth")
 @Tag(name = "Autenticação", description = "Endpoint de login para obtenção do token JWT")
@@ -32,6 +37,9 @@ public class AuthController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private TokenBlacklist tokenBlacklist;
 
     @PostMapping("/login")
     @Operation(summary = "Login", description = "Retorna um token JWT válido por 24h")
@@ -49,5 +57,17 @@ public class AuthController {
             log.warn("Tentativa de login falhou: username={}", dto.getUsername());
             return ResponseEntity.status(401).body("Credenciais inválidas");
         }
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Logout", description = "Invalida o token JWT atual")
+    public ResponseEntity<?> logout(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            tokenBlacklist.add(token, jwtUtil.extractExpiration(token));
+            log.info("Logout realizado com sucesso");
+        }
+        return ResponseEntity.ok().body("{\"mensagem\":\"Logout realizado com sucesso\"}");
     }
 }

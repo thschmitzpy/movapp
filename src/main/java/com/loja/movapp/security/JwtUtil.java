@@ -12,6 +12,10 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
+/**
+ * Utilitário JWT: gera tokens de acesso, valida assinatura e extrai informações como
+ * nome de usuário e data de expiração.
+ */
 @Component
 public class JwtUtil {
 
@@ -47,6 +51,10 @@ public class JwtUtil {
         } catch (JwtException e) {
             return false;
         }
+    }
+
+    public Date extractExpiration(String token) {
+        return getClaims(token).getExpiration();
     }
 
     private boolean isExpired(String token) {
