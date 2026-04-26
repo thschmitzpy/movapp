@@ -2,6 +2,8 @@ package com.loja.movapp.model;
 
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "produtos")
 public class Produto {
@@ -19,23 +21,30 @@ public class Produto {
     @Column(name = "tamanho")
     private String tamanho;
 
-    @Column(name = "preco")
-    private double preco;
+    @Column(name = "preco", precision = 10, scale = 2)
+    private BigDecimal preco;
 
     @Column(name = "estoque")
     private int estoque;
+
+    // Controla locking otimista: JPA inclui WHERE versao=? em cada UPDATE,
+    // garantindo que vendas simultâneas não corrompam o estoque.
+    @Version
+    @Column(name = "versao")
+    private Long versao;
 
     public String getCodigo()  { return codigo;  }
     public String getNome()    { return nome;    }
     public String getCor()     { return cor;     }
     public String getTamanho() { return tamanho; }
-    public double getPreco()   { return preco;   }
-    public int    getEstoque() { return estoque; }
+    public BigDecimal getPreco()   { return preco;   }
+    public int        getEstoque() { return estoque; }
+    public Long       getVersao()  { return versao;  }
 
-    public void setCodigo(String codigo)   { this.codigo  = codigo;  }
-    public void setNome(String nome)       { this.nome    = nome;    }
-    public void setCor(String cor)         { this.cor     = cor;     }
-    public void setTamanho(String tamanho) { this.tamanho = tamanho; }
-    public void setPreco(double preco)     { this.preco   = preco;   }
-    public void setEstoque(int estoque)    { this.estoque = estoque; }
+    public void setCodigo(String codigo)      { this.codigo  = codigo;  }
+    public void setNome(String nome)          { this.nome    = nome;    }
+    public void setCor(String cor)            { this.cor     = cor;     }
+    public void setTamanho(String tamanho)    { this.tamanho = tamanho; }
+    public void setPreco(BigDecimal preco)    { this.preco   = preco;   }
+    public void setEstoque(int estoque)       { this.estoque = estoque; }
 }

@@ -120,6 +120,7 @@ class ProdutoServiceTest {
         verify(repository, never()).deleteById(any());
     }
 
+
     @Test
     void deveLancarRecursoNaoEncontradoAoExcluirProdutoInexistente() {
         when(repository.findById("999")).thenReturn(Optional.empty());

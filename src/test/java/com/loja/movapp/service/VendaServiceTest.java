@@ -6,10 +6,13 @@ import com.loja.movapp.dto.VendaResponseDTO;
 import com.loja.movapp.exception.EstoqueInsuficienteException;
 import com.loja.movapp.exception.OperacaoNaoPermitidaException;
 import com.loja.movapp.exception.RecursoNaoEncontradoException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import com.loja.movapp.model.ItemVenda;
 import com.loja.movapp.model.Produto;
 import com.loja.movapp.model.StatusVenda;
 import com.loja.movapp.model.Venda;
+
+import java.math.BigDecimal;
 import com.loja.movapp.repository.ProdutoRepository;
 import com.loja.movapp.repository.VendaRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +52,7 @@ class VendaServiceTest {
         produto.setCodigo("001");
         produto.setNome("Camiseta");
         produto.setCor("Azul");
-        produto.setPreco(29.90);
+        produto.setPreco(new BigDecimal("29.90"));
         produto.setEstoque(50);
 
         itemRequest = new ItemVendaRequestDTO();
@@ -63,11 +66,11 @@ class VendaServiceTest {
         vendaRequest.setStatus(StatusVenda.PENDENTE);
     }
 
-    private Venda vendaSalvaMock(Long id, double total) {
+    private Venda vendaSalvaMock(Long id, String total) {
         Venda v = new Venda();
         v.setId(id);
         v.setData(LocalDateTime.now());
-        v.setTotal(total);
+        v.setTotal(new BigDecimal(total));
         v.setFormaPagamento("Pix");
         v.setCondicaoPagamento("À vista");
         v.setStatus(StatusVenda.PENDENTE);
@@ -79,7 +82,7 @@ class VendaServiceTest {
     void deveRealizarVendaComSucesso() {
         when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
         when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
-        when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, 59.80));
+        when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "59.80"));
 
         VendaResponseDTO resultado = service.realizarVenda(vendaRequest);
 
@@ -95,7 +98,7 @@ class VendaServiceTest {
 
         when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
         when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
-        when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, 59.80));
+        when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "59.80"));
 
         service.realizarVenda(vendaRequest);
 
@@ -106,11 +109,11 @@ class VendaServiceTest {
     void deveCalcularTotalCorretamente() {
         when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
         when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
-        when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, 59.80));
+        when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "59.80"));
 
         VendaResponseDTO resultado = service.realizarVenda(vendaRequest);
 
-        assertEquals(59.80, resultado.getTotal());
+        assertEquals(new BigDecimal("59.80"), resultado.getTotal());
     }
 
     @Test
@@ -118,7 +121,7 @@ class VendaServiceTest {
         Produto produto2 = new Produto();
         produto2.setCodigo("002");
         produto2.setNome("Calça");
-        produto2.setPreco(89.90);
+        produto2.setPreco(new BigDecimal("89.90"));
         produto2.setEstoque(30);
 
         ItemVendaRequestDTO item2 = new ItemVendaRequestDTO();
@@ -134,7 +137,7 @@ class VendaServiceTest {
         when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
         when(produtoRepository.findById("002")).thenReturn(Optional.of(produto2));
         when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
-        when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, 149.70));
+        when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "149.70"));
 
         VendaResponseDTO resultado = service.realizarVenda(vendaDois);
 
@@ -189,7 +192,7 @@ class VendaServiceTest {
 
     @Test
     void deveLancarOperacaoNaoPermitidaAoAtualizarVendaFechada() {
-        Venda vendaFechada = vendaSalvaMock(1L, 59.80);
+        Venda vendaFechada = vendaSalvaMock(1L, "59.80");
         vendaFechada.setStatus(StatusVenda.FECHADA);
 
         when(vendaRepository.findById(1L)).thenReturn(Optional.of(vendaFechada));
@@ -202,7 +205,7 @@ class VendaServiceTest {
 
     @Test
     void deveLancarOperacaoNaoPermitidaAoExcluirVendaFechada() {
-        Venda vendaFechada = vendaSalvaMock(1L, 59.80);
+        Venda vendaFechada = vendaSalvaMock(1L, "59.80");
         vendaFechada.setStatus(StatusVenda.FECHADA);
 
         when(vendaRepository.findById(1L)).thenReturn(Optional.of(vendaFechada));
@@ -211,6 +214,18 @@ class VendaServiceTest {
                 () -> service.excluirVenda(1L));
 
         assertTrue(ex.getMessage().contains("PENDENTES"));
+    }
+
+    @Test
+    void devePropagaExcecaoDeConcorrenciaAoSalvarProduto() {
+        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
+        when(produtoRepository.save(any(Produto.class)))
+                .thenThrow(new ObjectOptimisticLockingFailureException(Produto.class, "001"));
+
+        assertThrows(ObjectOptimisticLockingFailureException.class,
+                () -> service.realizarVenda(vendaRequest));
+
+        verify(vendaRepository, never()).save(any());
     }
 
     @Test

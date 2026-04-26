@@ -16,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -45,7 +46,7 @@ public class VendaService {
 
         List<ItemVenda> itens = new ArrayList<>();
         List<ItemVendaResponseDTO> itensResponse = new ArrayList<>();
-        double total = 0;
+        BigDecimal total = BigDecimal.ZERO;
 
         for (ItemVendaRequestDTO itemDTO : dto.getItens()) {
             Produto produto = produtoRepository.findById(itemDTO.getCodigoProduto())
@@ -75,7 +76,7 @@ public class VendaService {
             item.setPrecoUnit(produto.getPreco());
             itens.add(item);
 
-            total += produto.getPreco() * itemDTO.getQuantidade();
+            total = total.add(produto.getPreco().multiply(BigDecimal.valueOf(itemDTO.getQuantidade())));
             itensResponse.add(new ItemVendaResponseDTO(
                     produto.getCodigo(), produto.getNome(),
                     itemDTO.getQuantidade(), produto.getPreco()
@@ -118,7 +119,7 @@ public class VendaService {
         venda.getItens().clear();
 
         List<ItemVendaResponseDTO> itensResponse = new ArrayList<>();
-        double total = 0;
+        BigDecimal total = BigDecimal.ZERO;
 
         for (ItemVendaRequestDTO itemDTO : dto.getItens()) {
             Produto produto = produtoRepository.findById(itemDTO.getCodigoProduto())
@@ -147,7 +148,7 @@ public class VendaService {
             novoItem.setPrecoUnit(produto.getPreco());
             venda.getItens().add(novoItem);
 
-            total += produto.getPreco() * itemDTO.getQuantidade();
+            total = total.add(produto.getPreco().multiply(BigDecimal.valueOf(itemDTO.getQuantidade())));
             itensResponse.add(new ItemVendaResponseDTO(
                     produto.getCodigo(), produto.getNome(),
                     itemDTO.getQuantidade(), produto.getPreco()

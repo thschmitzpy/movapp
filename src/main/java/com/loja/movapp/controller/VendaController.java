@@ -51,6 +51,15 @@ public class VendaController {
         return ResponseEntity.ok(service.buscarPorFiltros(id, data, pageable));
     }
 
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Excluir venda pendente",
+            description = "Remove uma venda PENDENTE e restaura o estoque dos produtos")
+    public ResponseEntity<Void> excluir(
+            @Parameter(description = "ID da venda") @PathVariable Long id) {
+        service.excluirVenda(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/todas")
     @Operation(summary = "Listar todas as vendas", description = "Retorna todas as vendas sem paginação")
     public ResponseEntity<List<VendaResponseDTO>> listarTodas() {

@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -41,6 +42,17 @@ public class GlobalExceptionHandler {
         log.warn("Operação não permitida [{}]: {}", request.getRequestURI(), ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErroResponse(HttpStatus.CONFLICT.value(), ex.getMessage(), request.getRequestURI()));
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ErroResponse> handleConflitoConcorrencia(
+            ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
+
+        log.warn("Conflito de concorrência ao atualizar estoque [{}]", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErroResponse(HttpStatus.CONFLICT.value(),
+                        "Conflito ao atualizar estoque: outro processo modificou o produto simultaneamente. Tente novamente.",
+                        request.getRequestURI()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

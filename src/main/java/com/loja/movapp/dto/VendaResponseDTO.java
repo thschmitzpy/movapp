@@ -2,6 +2,7 @@ package com.loja.movapp.dto;
 
 import com.loja.movapp.model.StatusVenda;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -14,13 +15,13 @@ public class VendaResponseDTO {
 
     private Long id;
     private LocalDateTime data;
-    private double total;
+    private BigDecimal total;
     private String formaPagamento;
     private String condicaoPagamento;
     private StatusVenda status;
     private List<ItemVendaResponseDTO> itens;
 
-    public VendaResponseDTO(Long id, LocalDateTime data, double total,
+    public VendaResponseDTO(Long id, LocalDateTime data, BigDecimal total,
                             String formaPagamento, String condicaoPagamento,
                             StatusVenda status, List<ItemVendaResponseDTO> itens) {
         this.id                = id;
@@ -34,7 +35,7 @@ public class VendaResponseDTO {
 
     public Long getId()                          { return id;                }
     public LocalDateTime getData()               { return data;              }
-    public double getTotal()                     { return total;             }
+    public BigDecimal getTotal()                 { return total;             }
     public String getFormaPagamento()            { return formaPagamento;    }
     public String getCondicaoPagamento()         { return condicaoPagamento; }
     public StatusVenda getStatus()               { return status;            }

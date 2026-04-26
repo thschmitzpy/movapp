@@ -6,6 +6,7 @@ import com.loja.movapp.exception.OperacaoNaoPermitidaException;
 import com.loja.movapp.exception.RecursoNaoEncontradoException;
 import com.loja.movapp.model.Produto;
 import com.loja.movapp.repository.ProdutoRepository;
+import java.math.BigDecimal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -99,11 +100,11 @@ public class ProdutoService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ProdutoResponseDTO> buscarPorFaixaDePreco(double min, double max, Pageable pageable) {
-        if (min < 0 || max < 0) {
+    public Page<ProdutoResponseDTO> buscarPorFaixaDePreco(BigDecimal min, BigDecimal max, Pageable pageable) {
+        if (min.compareTo(BigDecimal.ZERO) < 0 || max.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("Os valores de preço não podem ser negativos!");
         }
-        if (min > max) {
+        if (min.compareTo(max) > 0) {
             throw new IllegalArgumentException("O preço mínimo não pode ser maior que o máximo!");
         }
         log.info("Buscando produtos por faixa de preço: min={}, max={}", min, max);
@@ -123,7 +124,7 @@ public class ProdutoService {
         if (dto.getNome()    != null) p.setNome(dto.getNome());
         if (dto.getCor()     != null) p.setCor(dto.getCor());
         if (dto.getTamanho() != null) p.setTamanho(dto.getTamanho());
-        if (dto.getPreco()   >  0)    p.setPreco(dto.getPreco());
+        if (dto.getPreco()   != null && dto.getPreco().compareTo(BigDecimal.ZERO) > 0) p.setPreco(dto.getPreco());
         if (dto.getEstoque() >= 0)    p.setEstoque(dto.getEstoque());
 
         ProdutoResponseDTO atualizado = toDTO(repository.save(p));

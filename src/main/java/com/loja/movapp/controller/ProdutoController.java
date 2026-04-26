@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.net.URI;
 
 @RestController
@@ -93,8 +94,8 @@ public class ProdutoController {
     @Operation(summary = "Buscar por faixa de preço",
             description = "Retorna produtos entre o preço mínimo e máximo com paginação")
     public ResponseEntity<Page<ProdutoResponseDTO>> buscarPorFaixaDePreco(
-            @Parameter(description = "Preço mínimo") @RequestParam double min,
-            @Parameter(description = "Preço máximo") @RequestParam double max,
+            @Parameter(description = "Preço mínimo") @RequestParam BigDecimal min,
+            @Parameter(description = "Preço máximo") @RequestParam BigDecimal max,
             Pageable pageable) {
         Page<ProdutoResponseDTO> produtos = service.buscarPorFaixaDePreco(min, max, pageable);
         if (produtos.isEmpty()) {
