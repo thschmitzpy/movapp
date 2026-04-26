@@ -17,6 +17,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,7 +43,7 @@ class ProdutoServiceTest {
         produto.setNome("Camiseta");
         produto.setCor("Azul");
         produto.setTamanho("M");
-        produto.setPreco(29.90);
+        produto.setPreco(new BigDecimal("29.90"));
         produto.setEstoque(50);
 
         requestDTO = new ProdutoRequestDTO();
@@ -50,7 +51,7 @@ class ProdutoServiceTest {
         requestDTO.setNome("Camiseta");
         requestDTO.setCor("Azul");
         requestDTO.setTamanho("M");
-        requestDTO.setPreco(29.90);
+        requestDTO.setPreco(new BigDecimal("29.90"));
         requestDTO.setEstoque(50);
     }
 
@@ -138,7 +139,7 @@ class ProdutoServiceTest {
 
         ProdutoRequestDTO dtoAtualizado = new ProdutoRequestDTO();
         dtoAtualizado.setNome("Camiseta Premium");
-        dtoAtualizado.setPreco(49.90);
+        dtoAtualizado.setPreco(new BigDecimal("49.90"));
 
         ProdutoResponseDTO resultado = service.editar("001", dtoAtualizado);
 
@@ -161,9 +162,9 @@ class ProdutoServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Produto> page = new PageImpl<>(List.of(produto));
 
-        when(repository.buscarPorFaixaDePreco(10.0, 50.0, pageable)).thenReturn(page);
+        when(repository.buscarPorFaixaDePreco(new BigDecimal("10.0"), new BigDecimal("50.0"), pageable)).thenReturn(page);
 
-        Page<ProdutoResponseDTO> resultado = service.buscarPorFaixaDePreco(10.0, 50.0, pageable);
+        Page<ProdutoResponseDTO> resultado = service.buscarPorFaixaDePreco(new BigDecimal("10.0"), new BigDecimal("50.0"), pageable);
 
         assertFalse(resultado.isEmpty());
         assertEquals(1, resultado.getTotalElements());
@@ -174,7 +175,7 @@ class ProdutoServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.buscarPorFaixaDePreco(100.0, 10.0, pageable));
+                () -> service.buscarPorFaixaDePreco(new BigDecimal("100.0"), new BigDecimal("10.0"), pageable));
 
         assertTrue(ex.getMessage().contains("mínimo não pode ser maior"));
     }
@@ -184,7 +185,7 @@ class ProdutoServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.buscarPorFaixaDePreco(-10.0, 50.0, pageable));
+                () -> service.buscarPorFaixaDePreco(new BigDecimal("-10.0"), new BigDecimal("50.0"), pageable));
 
         assertTrue(ex.getMessage().contains("não podem ser negativos"));
     }
