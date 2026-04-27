@@ -2,6 +2,7 @@ package com.loja.movapp.model;
 
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -16,8 +17,8 @@ public class Venda {
     @Column(name = "data")
     private LocalDateTime data;
 
-    @Column(name = "total")
-    private double total;
+    @Column(name = "total", precision = 10, scale = 2)
+    private BigDecimal total;
 
     @Column(name = "forma_pagamento")
     private String formaPagamento;
@@ -34,7 +35,7 @@ public class Venda {
 
     public Long getId()                    { return id;                }
     public LocalDateTime getData()         { return data;              }
-    public double getTotal()               { return total;             }
+    public BigDecimal getTotal()           { return total;             }
     public String getFormaPagamento()      { return formaPagamento;    }
     public String getCondicaoPagamento()   { return condicaoPagamento; }
     public StatusVenda getStatus()         { return status;            }
@@ -42,7 +43,7 @@ public class Venda {
 
     public void setId(Long id)                          { this.id                = id;                }
     public void setData(LocalDateTime data)             { this.data              = data;              }
-    public void setTotal(double total)                  { this.total             = total;             }
+    public void setTotal(BigDecimal total)              { this.total             = total;             }
     public void setFormaPagamento(String f)             { this.formaPagamento    = f;                 }
     public void setCondicaoPagamento(String c)          { this.condicaoPagamento = c;                 }
     public void setStatus(StatusVenda status)           { this.status            = status;            }

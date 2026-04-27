@@ -2,6 +2,8 @@ package com.loja.movapp.model;
 
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "itens_venda")
 public class ItemVenda {
@@ -21,20 +23,20 @@ public class ItemVenda {
     @Column(name = "quantidade")
     private int quantidade;
 
-    @Column(name = "preco_unit")
-    private double precoUnit;
+    @Column(name = "preco_unit", precision = 10, scale = 2)
+    private BigDecimal precoUnit;
 
-    public Long getId()          { return id;         }
-    public Venda getVenda()      { return venda;      }
-    public Produto getProduto()  { return produto;    }
-    public int getQuantidade()   { return quantidade; }
-    public double getPrecoUnit() { return precoUnit;  }
+    public Long       getId()          { return id;         }
+    public Venda      getVenda()       { return venda;      }
+    public Produto    getProduto()     { return produto;    }
+    public int        getQuantidade()  { return quantidade; }
+    public BigDecimal getPrecoUnit()   { return precoUnit;  }
 
-    public void setId(Long id)              { this.id         = id;         }
-    public void setVenda(Venda venda)       { this.venda      = venda;      }
-    public void setProduto(Produto produto) { this.produto    = produto;    }
-    public void setQuantidade(int qtd)      { this.quantidade = qtd;        }
-    public void setPrecoUnit(double preco)  { this.precoUnit  = preco;      }
+    public void setId(Long id)                  { this.id         = id;         }
+    public void setVenda(Venda venda)           { this.venda      = venda;      }
+    public void setProduto(Produto produto)     { this.produto    = produto;    }
+    public void setQuantidade(int qtd)          { this.quantidade = qtd;        }
+    public void setPrecoUnit(BigDecimal preco)  { this.precoUnit  = preco;      }
 }
 
 

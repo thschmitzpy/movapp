@@ -3,8 +3,16 @@ package com.loja.movapp.service;
 import com.loja.movapp.dto.ItemVendaRequestDTO;
 import com.loja.movapp.dto.VendaRequestDTO;
 import com.loja.movapp.dto.VendaResponseDTO;
+import com.loja.movapp.exception.EstoqueInsuficienteException;
+import com.loja.movapp.exception.OperacaoNaoPermitidaException;
+import com.loja.movapp.exception.RecursoNaoEncontradoException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import com.loja.movapp.model.ItemVenda;
 import com.loja.movapp.model.Produto;
+import com.loja.movapp.model.StatusVenda;
 import com.loja.movapp.model.Venda;
+
+import java.math.BigDecimal;
 import com.loja.movapp.repository.ProdutoRepository;
 import com.loja.movapp.repository.VendaRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,10 +30,8 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-
 @ExtendWith(MockitoExtension.class)
 class VendaServiceTest {
-
 
     @Mock
     private VendaRepository vendaRepository;
@@ -40,15 +46,13 @@ class VendaServiceTest {
     private VendaRequestDTO vendaRequest;
     private ItemVendaRequestDTO itemRequest;
 
-
     @BeforeEach
     void setUp() {
-
         produto = new Produto();
         produto.setCodigo("001");
         produto.setNome("Camiseta");
         produto.setCor("Azul");
-        produto.setPreco(29.90);
+        produto.setPreco(new BigDecimal("29.90"));
         produto.setEstoque(50);
 
         itemRequest = new ItemVendaRequestDTO();
@@ -57,26 +61,28 @@ class VendaServiceTest {
 
         vendaRequest = new VendaRequestDTO();
         vendaRequest.setItens(List.of(itemRequest));
+        vendaRequest.setFormaPagamento("Pix");
+        vendaRequest.setCondicaoPagamento("À vista");
+        vendaRequest.setStatus(StatusVenda.PENDENTE);
     }
 
+    private Venda vendaSalvaMock(Long id, String total) {
+        Venda v = new Venda();
+        v.setId(id);
+        v.setData(LocalDateTime.now());
+        v.setTotal(new BigDecimal(total));
+        v.setFormaPagamento("Pix");
+        v.setCondicaoPagamento("À vista");
+        v.setStatus(StatusVenda.PENDENTE);
+        v.setItens(new ArrayList<>());
+        return v;
+    }
 
     @Test
     void deveRealizarVendaComSucesso() {
-
-        when(produtoRepository.findById("001"))
-                .thenReturn(Optional.of(produto));
-
-        when(produtoRepository.save(any(Produto.class)))
-                .thenReturn(produto);
-
-        Venda vendaSalva = new Venda();
-        vendaSalva.setId(1L);
-        vendaSalva.setData(LocalDateTime.now());
-        vendaSalva.setTotal(59.80);
-        vendaSalva.setItens(new ArrayList<>());
-
-        when(vendaRepository.save(any(Venda.class)))
-                .thenReturn(vendaSalva);
+        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
+        when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
+        when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "59.80"));
 
         VendaResponseDTO resultado = service.realizarVenda(vendaRequest);
 
@@ -88,36 +94,62 @@ class VendaServiceTest {
 
     @Test
     void deveDescontarEstoqueAoRealizarVenda() {
+        int estoqueAntes = produto.getEstoque();
 
-        int estoqueAntes = produto.getEstoque(); // 50
-
-        when(produtoRepository.findById("001"))
-                .thenReturn(Optional.of(produto));
-        when(produtoRepository.save(any(Produto.class)))
-                .thenReturn(produto);
-
-        Venda vendaSalva = new Venda();
-        vendaSalva.setId(1L);
-        vendaSalva.setData(LocalDateTime.now());
-        vendaSalva.setTotal(59.80);
-        vendaSalva.setItens(new ArrayList<>());
-
-        when(vendaRepository.save(any(Venda.class)))
-                .thenReturn(vendaSalva);
+        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
+        when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
+        when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "59.80"));
 
         service.realizarVenda(vendaRequest);
-
 
         assertEquals(estoqueAntes - 2, produto.getEstoque());
     }
 
     @Test
-    void deveLancarExcecaoQuandoProdutoNaoEncontrado() {
+    void deveCalcularTotalCorretamente() {
+        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
+        when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
+        when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "59.80"));
 
-        when(produtoRepository.findById("001"))
-                .thenReturn(Optional.empty());
+        VendaResponseDTO resultado = service.realizarVenda(vendaRequest);
 
-        RuntimeException ex = assertThrows(RuntimeException.class,
+        assertEquals(new BigDecimal("59.80"), resultado.getTotal());
+    }
+
+    @Test
+    void deveRealizarVendaComMultiplosProdutos() {
+        Produto produto2 = new Produto();
+        produto2.setCodigo("002");
+        produto2.setNome("Calça");
+        produto2.setPreco(new BigDecimal("89.90"));
+        produto2.setEstoque(30);
+
+        ItemVendaRequestDTO item2 = new ItemVendaRequestDTO();
+        item2.setCodigoProduto("002");
+        item2.setQuantidade(1);
+
+        VendaRequestDTO vendaDois = new VendaRequestDTO();
+        vendaDois.setItens(List.of(itemRequest, item2));
+        vendaDois.setFormaPagamento("Cartão de Crédito");
+        vendaDois.setCondicaoPagamento("2x sem juros");
+        vendaDois.setStatus(StatusVenda.PENDENTE);
+
+        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
+        when(produtoRepository.findById("002")).thenReturn(Optional.of(produto2));
+        when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
+        when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "149.70"));
+
+        VendaResponseDTO resultado = service.realizarVenda(vendaDois);
+
+        assertNotNull(resultado);
+        verify(produtoRepository, times(2)).save(any(Produto.class));
+    }
+
+    @Test
+    void deveLancarRecursoNaoEncontradoQuandoProdutoInexistente() {
+        when(produtoRepository.findById("001")).thenReturn(Optional.empty());
+
+        RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
                 () -> service.realizarVenda(vendaRequest));
 
         assertTrue(ex.getMessage().contains("não encontrado"));
@@ -125,15 +157,11 @@ class VendaServiceTest {
     }
 
     @Test
-    void deveLancarExcecaoQuandoEstoqueInsuficiente() {
+    void deveLancarEstoqueInsuficienteQuandoQuantidadeMaiorQueEstoque() {
+        produto.setEstoque(1);
+        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
 
-        // produto com estoque menor que a quantidade pedida
-        produto.setEstoque(1); // tem 1, pediu 2
-
-        when(produtoRepository.findById("001"))
-                .thenReturn(Optional.of(produto));
-
-        RuntimeException ex = assertThrows(RuntimeException.class,
+        EstoqueInsuficienteException ex = assertThrows(EstoqueInsuficienteException.class,
                 () -> service.realizarVenda(vendaRequest));
 
         assertTrue(ex.getMessage().contains("Estoque insuficiente"));
@@ -142,89 +170,69 @@ class VendaServiceTest {
     }
 
     @Test
-    void deveLancarExcecaoQuandoEstoqueZero() {
+    void deveLancarEstoqueInsuficienteQuandoEstoqueZero() {
+        produto.setEstoque(0);
+        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
 
-        produto.setEstoque(0); // sem estoque
-
-        when(produtoRepository.findById("001"))
-                .thenReturn(Optional.of(produto));
-
-        RuntimeException ex = assertThrows(RuntimeException.class,
+        EstoqueInsuficienteException ex = assertThrows(EstoqueInsuficienteException.class,
                 () -> service.realizarVenda(vendaRequest));
 
         assertTrue(ex.getMessage().contains("Estoque insuficiente"));
     }
 
     @Test
-    void deveCalcularTotalCorretamente() {
+    void deveLancarRecursoNaoEncontradoAoAtualizarVendaInexistente() {
+        when(vendaRepository.findById(99L)).thenReturn(Optional.empty());
 
+        RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.atualizarVenda(99L, vendaRequest));
 
-        when(produtoRepository.findById("001"))
-                .thenReturn(Optional.of(produto));
-        when(produtoRepository.save(any(Produto.class)))
-                .thenReturn(produto);
-
-        Venda vendaSalva = new Venda();
-        vendaSalva.setId(1L);
-        vendaSalva.setData(LocalDateTime.now());
-        vendaSalva.setTotal(59.80);
-        vendaSalva.setItens(new ArrayList<>());
-
-        when(vendaRepository.save(any(Venda.class)))
-                .thenReturn(vendaSalva);
-
-        VendaResponseDTO resultado = service.realizarVenda(vendaRequest);
-
-        assertEquals(59.80, resultado.getTotal());
+        assertTrue(ex.getMessage().contains("não encontrada"));
     }
 
     @Test
-    void deveRealizarVendaComMultiplosProdutos() {
+    void deveLancarOperacaoNaoPermitidaAoAtualizarVendaFechada() {
+        Venda vendaFechada = vendaSalvaMock(1L, "59.80");
+        vendaFechada.setStatus(StatusVenda.FECHADA);
 
-        // segundo produto
-        Produto produto2 = new Produto();
-        produto2.setCodigo("002");
-        produto2.setNome("Calça");
-        produto2.setPreco(89.90);
-        produto2.setEstoque(30);
+        when(vendaRepository.findById(1L)).thenReturn(Optional.of(vendaFechada));
 
+        OperacaoNaoPermitidaException ex = assertThrows(OperacaoNaoPermitidaException.class,
+                () -> service.atualizarVenda(1L, vendaRequest));
 
-        ItemVendaRequestDTO item2 = new ItemVendaRequestDTO();
-        item2.setCodigoProduto("002");
-        item2.setQuantidade(1);
+        assertTrue(ex.getMessage().contains("PENDENTES"));
+    }
 
+    @Test
+    void deveLancarOperacaoNaoPermitidaAoExcluirVendaFechada() {
+        Venda vendaFechada = vendaSalvaMock(1L, "59.80");
+        vendaFechada.setStatus(StatusVenda.FECHADA);
 
-        VendaRequestDTO vendaDois = new VendaRequestDTO();
-        vendaDois.setItens(List.of(itemRequest, item2));
+        when(vendaRepository.findById(1L)).thenReturn(Optional.of(vendaFechada));
 
-        when(produtoRepository.findById("001"))
-                .thenReturn(Optional.of(produto));
-        when(produtoRepository.findById("002"))
-                .thenReturn(Optional.of(produto2));
+        OperacaoNaoPermitidaException ex = assertThrows(OperacaoNaoPermitidaException.class,
+                () -> service.excluirVenda(1L));
+
+        assertTrue(ex.getMessage().contains("PENDENTES"));
+    }
+
+    @Test
+    void devePropagaExcecaoDeConcorrenciaAoSalvarProduto() {
+        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
         when(produtoRepository.save(any(Produto.class)))
-                .thenReturn(produto);
+                .thenThrow(new ObjectOptimisticLockingFailureException(Produto.class, "001"));
 
-        Venda vendaSalva = new Venda();
-        vendaSalva.setId(1L);
-        vendaSalva.setData(LocalDateTime.now());
-        vendaSalva.setTotal(149.70);
-        vendaSalva.setItens(new ArrayList<>());
+        assertThrows(ObjectOptimisticLockingFailureException.class,
+                () -> service.realizarVenda(vendaRequest));
 
-        when(vendaRepository.save(any(Venda.class)))
-                .thenReturn(vendaSalva);
-
-        VendaResponseDTO resultado = service.realizarVenda(vendaDois);
-
-        assertNotNull(resultado);
-
-        verify(produtoRepository, times(2)).save(any(Produto.class));
+        verify(vendaRepository, never()).save(any());
     }
 
     @Test
     void deveListarVendasVazia() {
         when(vendaRepository.findAll()).thenReturn(new ArrayList<>());
 
-        List<VendaResponseDTO> resultado = service.listarVendas();
+        var resultado = service.listarVendas();
 
         assertNotNull(resultado);
         assertTrue(resultado.isEmpty());

@@ -2,6 +2,8 @@ package com.loja.movapp.service;
 
 import com.loja.movapp.dto.ProdutoRequestDTO;
 import com.loja.movapp.dto.ProdutoResponseDTO;
+import com.loja.movapp.exception.OperacaoNaoPermitidaException;
+import com.loja.movapp.exception.RecursoNaoEncontradoException;
 import com.loja.movapp.model.Produto;
 import com.loja.movapp.repository.ProdutoRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +17,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,7 +43,7 @@ class ProdutoServiceTest {
         produto.setNome("Camiseta");
         produto.setCor("Azul");
         produto.setTamanho("M");
-        produto.setPreco(29.90);
+        produto.setPreco(new BigDecimal("29.90"));
         produto.setEstoque(50);
 
         requestDTO = new ProdutoRequestDTO();
@@ -48,12 +51,13 @@ class ProdutoServiceTest {
         requestDTO.setNome("Camiseta");
         requestDTO.setCor("Azul");
         requestDTO.setTamanho("M");
-        requestDTO.setPreco(29.90);
+        requestDTO.setPreco(new BigDecimal("29.90"));
         requestDTO.setEstoque(50);
     }
 
     @Test
     void deveSalvarProdutoComSucesso() {
+        when(repository.existsById("001")).thenReturn(false);
         when(repository.save(any(Produto.class))).thenReturn(produto);
 
         ProdutoResponseDTO resultado = service.salvar(requestDTO);
@@ -65,36 +69,34 @@ class ProdutoServiceTest {
     }
 
     @Test
+    void deveLancarOperacaoNaoPermitidaAoCadastrarCodigoDuplicado() {
+        when(repository.existsById("001")).thenReturn(true);
+
+        OperacaoNaoPermitidaException ex = assertThrows(OperacaoNaoPermitidaException.class,
+                () -> service.salvar(requestDTO));
+
+        assertTrue(ex.getMessage().contains("já está cadastrado"));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void deveBuscarProdutoPorCodigoExistente() {
         when(repository.findById("001")).thenReturn(Optional.of(produto));
 
-        Optional<ProdutoResponseDTO> resultado = service.buscarPorCodigo("001");
+        ProdutoResponseDTO resultado = service.buscarPorCodigo("001");
 
-        assertTrue(resultado.isPresent());
-        assertEquals("Camiseta", resultado.get().getNome());
+        assertNotNull(resultado);
+        assertEquals("Camiseta", resultado.getNome());
     }
 
     @Test
-    void deveRetornarVazioQuandoCodigoNaoExiste() {
+    void deveLancarRecursoNaoEncontradoAoBuscarCodigoInexistente() {
         when(repository.findById("999")).thenReturn(Optional.empty());
 
-        Optional<ProdutoResponseDTO> resultado = service.buscarPorCodigo("999");
+        RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.buscarPorCodigo("999"));
 
-        assertFalse(resultado.isPresent());
-    }
-
-    @Test
-    void deveRetornarTrueQuandoCodigoExiste() {
-        when(repository.existsById("001")).thenReturn(true);
-
-        assertTrue(service.existeCodigo("001"));
-    }
-
-    @Test
-    void deveRetornarFalseQuandoCodigoNaoExiste() {
-        when(repository.existsById("999")).thenReturn(false);
-
-        assertFalse(service.existeCodigo("999"));
+        assertTrue(ex.getMessage().contains("não encontrado"));
     }
 
     @Test
@@ -108,40 +110,61 @@ class ProdutoServiceTest {
     }
 
     @Test
-    void deveLancarExcecaoAoExcluirProdutoComEstoque() {
+    void deveLancarOperacaoNaoPermitidaAoExcluirProdutoComEstoque() {
         produto.setEstoque(10);
         when(repository.findById("001")).thenReturn(Optional.of(produto));
 
-        RuntimeException ex = assertThrows(RuntimeException.class,
+        OperacaoNaoPermitidaException ex = assertThrows(OperacaoNaoPermitidaException.class,
                 () -> service.excluir("001"));
 
         assertTrue(ex.getMessage().contains("não pode ser excluído"));
         verify(repository, never()).deleteById(any());
     }
 
+
     @Test
-    void deveLancarExcecaoAoExcluirProdutoInexistente() {
+    void deveLancarRecursoNaoEncontradoAoExcluirProdutoInexistente() {
         when(repository.findById("999")).thenReturn(Optional.empty());
 
-        RuntimeException ex = assertThrows(RuntimeException.class,
+        RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
                 () -> service.excluir("999"));
 
         assertTrue(ex.getMessage().contains("não encontrado"));
     }
 
     @Test
-    void deveBuscarPorFaixaDePrecoValida() {
+    void deveEditarProdutoComSucesso() {
+        when(repository.findById("001")).thenReturn(Optional.of(produto));
+        when(repository.save(any(Produto.class))).thenReturn(produto);
 
-        //cria um Pageable e um Page para o mock
+        ProdutoRequestDTO dtoAtualizado = new ProdutoRequestDTO();
+        dtoAtualizado.setNome("Camiseta Premium");
+        dtoAtualizado.setPreco(new BigDecimal("49.90"));
+
+        ProdutoResponseDTO resultado = service.editar("001", dtoAtualizado);
+
+        assertNotNull(resultado);
+        verify(repository, times(1)).save(any(Produto.class));
+    }
+
+    @Test
+    void deveLancarRecursoNaoEncontradoAoEditarProdutoInexistente() {
+        when(repository.findById("999")).thenReturn(Optional.empty());
+
+        RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.editar("999", requestDTO));
+
+        assertTrue(ex.getMessage().contains("não encontrado"));
+    }
+
+    @Test
+    void deveBuscarPorFaixaDePrecoValida() {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Produto> page = new PageImpl<>(List.of(produto));
 
-        when(repository.buscarPorFaixaDePreco(10.0, 50.0, pageable))
-                .thenReturn(page);
+        when(repository.buscarPorFaixaDePreco(new BigDecimal("10.0"), new BigDecimal("50.0"), pageable)).thenReturn(page);
 
-
-        Page<ProdutoResponseDTO> resultado =
-                service.buscarPorFaixaDePreco(10.0, 50.0, pageable);
+        Page<ProdutoResponseDTO> resultado = service.buscarPorFaixaDePreco(new BigDecimal("10.0"), new BigDecimal("50.0"), pageable);
 
         assertFalse(resultado.isEmpty());
         assertEquals(1, resultado.getTotalElements());
@@ -152,7 +175,7 @@ class ProdutoServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.buscarPorFaixaDePreco(100.0, 10.0, pageable));
+                () -> service.buscarPorFaixaDePreco(new BigDecimal("100.0"), new BigDecimal("10.0"), pageable));
 
         assertTrue(ex.getMessage().contains("mínimo não pode ser maior"));
     }
@@ -162,33 +185,8 @@ class ProdutoServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.buscarPorFaixaDePreco(-10.0, 50.0, pageable));
+                () -> service.buscarPorFaixaDePreco(new BigDecimal("-10.0"), new BigDecimal("50.0"), pageable));
 
         assertTrue(ex.getMessage().contains("não podem ser negativos"));
-    }
-
-    @Test
-    void deveEditarProdutoComSucesso() {
-        when(repository.findById("001")).thenReturn(Optional.of(produto));
-        when(repository.save(any(Produto.class))).thenReturn(produto);
-
-        ProdutoRequestDTO dtoAtualizado = new ProdutoRequestDTO();
-        dtoAtualizado.setNome("Camiseta Premium");
-        dtoAtualizado.setPreco(49.90);
-
-        ProdutoResponseDTO resultado = service.editar("001", dtoAtualizado);
-
-        assertNotNull(resultado);
-        verify(repository, times(1)).save(any(Produto.class));
-    }
-
-    @Test
-    void deveLancarExcecaoAoEditarProdutoInexistente() {
-        when(repository.findById("999")).thenReturn(Optional.empty());
-
-        RuntimeException ex = assertThrows(RuntimeException.class,
-                () -> service.editar("999", requestDTO));
-
-        assertTrue(ex.getMessage().contains("não encontrado"));
     }
 }

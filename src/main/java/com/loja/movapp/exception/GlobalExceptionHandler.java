@@ -1,75 +1,89 @@
 package com.loja.movapp.exception;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErroResponse> handlerException(
-            Exception ex, HttpServletRequest request) {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-        ErroResponse erro = new ErroResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "Erro Interno" + ex.getMessage(),
-                request.getRequestURI()
-        );
+    @ExceptionHandler(RecursoNaoEncontradoException.class)
+    public ResponseEntity<ErroResponse> handleNaoEncontrado(
+            RecursoNaoEncontradoException ex, HttpServletRequest request) {
 
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(erro);
+        log.warn("Recurso não encontrado [{}]: {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErroResponse(HttpStatus.NOT_FOUND.value(), ex.getMessage(), request.getRequestURI()));
+    }
+
+    @ExceptionHandler(EstoqueInsuficienteException.class)
+    public ResponseEntity<ErroResponse> handleEstoqueInsuficiente(
+            EstoqueInsuficienteException ex, HttpServletRequest request) {
+
+        log.warn("Estoque insuficiente [{}]: {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErroResponse(HttpStatus.CONFLICT.value(), ex.getMessage(), request.getRequestURI()));
+    }
+
+    @ExceptionHandler(OperacaoNaoPermitidaException.class)
+    public ResponseEntity<ErroResponse> handleOperacaoNaoPermitida(
+            OperacaoNaoPermitidaException ex, HttpServletRequest request) {
+
+        log.warn("Operação não permitida [{}]: {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErroResponse(HttpStatus.CONFLICT.value(), ex.getMessage(), request.getRequestURI()));
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ErroResponse> handleConflitoConcorrencia(
+            ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
+
+        log.warn("Conflito de concorrência ao atualizar estoque [{}]", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErroResponse(HttpStatus.CONFLICT.value(),
+                        "Conflito ao atualizar estoque: outro processo modificou o produto simultaneamente. Tente novamente.",
+                        request.getRequestURI()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErroResponse> handleIlegalArgument(
-            IllegalArgumentException ex, HttpServletRequest request){
+    public ResponseEntity<ErroResponse> handleIllegalArgument(
+            IllegalArgumentException ex, HttpServletRequest request) {
 
-        ErroResponse erro = new ErroResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                ex.getMessage(),
-                request.getRequestURI()
-        );
-
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(erro);
+        log.warn("Argumento inválido [{}]: {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErroResponse(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), request.getRequestURI()));
     }
 
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<ErroResponse> handleRunTimeException(
-            RuntimeException ex, HttpServletRequest request) {
-
-                ErroResponse erro = new ErroResponse(
-                        HttpStatus.NOT_FOUND.value(),
-                        ex.getMessage(),
-                        request.getRequestURI()
-                );
-
-                return ResponseEntity
-                        .status(HttpStatus.NOT_FOUND)
-                        .body(erro);
-    }
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErroResponse> handleValidationException(
+    public ResponseEntity<ErroResponse> handleValidation(
             MethodArgumentNotValidException ex, HttpServletRequest request) {
-        String message = ex.getBindingResult()
-                .getFieldErrors()
-                .stream()
-                .map(erro -> erro.getDefaultMessage())
+
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .map(e -> e.getDefaultMessage())
                 .collect(Collectors.joining(", "));
 
-        ErroResponse erro = new ErroResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                message,
-                request.getRequestURI()
-        );
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(erro);
+        log.warn("Validação falhou [{}]: {}", request.getRequestURI(), message);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErroResponse(HttpStatus.BAD_REQUEST.value(), message, request.getRequestURI()));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErroResponse> handleGeneric(
+            Exception ex, HttpServletRequest request) {
+
+        log.error("Erro interno [{}]: {}", request.getRequestURI(), ex.getMessage(), ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErroResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                        "Erro interno: " + ex.getMessage(), request.getRequestURI()));
     }
 }

@@ -17,11 +17,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * Controller de Venda.
- * Responsável por receber as requisições de venda
- * e devolver as respostas para o cliente.
- */
 @RestController
 @RequestMapping("/vendas")
 @Tag(name = "Vendas", description = "Endpoints para gerenciamento de vendas")
@@ -30,30 +25,19 @@ public class VendaController {
     @Autowired
     private VendaService service;
 
-
     @PostMapping
-    @Operation(summary = "Realizar venda",
-            description = "Registra uma nova venda e atualiza o estoque")
-    public ResponseEntity<?> realizarVenda(@Valid @RequestBody VendaRequestDTO dto) {
-        try {
-            VendaResponseDTO venda = service.realizarVenda(dto);
-            return ResponseEntity.ok(venda);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    @Operation(summary = "Realizar venda", description = "Registra uma nova venda e atualiza o estoque")
+    public ResponseEntity<VendaResponseDTO> realizarVenda(@Valid @RequestBody VendaRequestDTO dto) {
+        return ResponseEntity.ok(service.realizarVenda(dto));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar venda pendente",
             description = "Permite alterar itens, pagamento e status de uma venda PENDENTE")
-    public ResponseEntity<?> atualizar(
+    public ResponseEntity<VendaResponseDTO> atualizar(
             @Parameter(description = "ID da venda") @PathVariable Long id,
             @Valid @RequestBody VendaRequestDTO dto) {
-        try {
-            return ResponseEntity.ok(service.atualizarVenda(id, dto));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+        return ResponseEntity.ok(service.atualizarVenda(id, dto));
     }
 
     @GetMapping
@@ -67,9 +51,17 @@ public class VendaController {
         return ResponseEntity.ok(service.buscarPorFiltros(id, data, pageable));
     }
 
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Excluir venda pendente",
+            description = "Remove uma venda PENDENTE e restaura o estoque dos produtos")
+    public ResponseEntity<Void> excluir(
+            @Parameter(description = "ID da venda") @PathVariable Long id) {
+        service.excluirVenda(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/todas")
-    @Operation(summary = "Listar todas as vendas",
-            description = "Retorna todas as vendas sem paginação")
+    @Operation(summary = "Listar todas as vendas", description = "Retorna todas as vendas sem paginação")
     public ResponseEntity<List<VendaResponseDTO>> listarTodas() {
         return ResponseEntity.ok(service.listarVendas());
     }

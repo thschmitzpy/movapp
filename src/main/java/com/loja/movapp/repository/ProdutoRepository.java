@@ -8,14 +8,10 @@ import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import java.util.List;
+import java.math.BigDecimal;
 
 @Repository
-public interface ProdutoRepository  extends JpaRepository <Produto, String>{
-
-    @Query("SELECT p FROM Produto p WHERE p.preco >= :min AND p.preco <= :max")
-    List<Produto> buscarPorFaixaDePreco(@Param("min") double min,
-                                        @Param("max") double max);
+public interface ProdutoRepository extends JpaRepository<Produto, String> {
 
     Page<Produto> findAll(Pageable pageable);
 
@@ -23,8 +19,8 @@ public interface ProdutoRepository  extends JpaRepository <Produto, String>{
 
     @Query("SELECT p FROM Produto p WHERE p.preco >= :min AND p.preco <= :max")
     Page<Produto> buscarPorFaixaDePreco(
-            @Param("min") double min,
-            @Param("max") double max,
+            @Param("min") BigDecimal min,
+            @Param("max") BigDecimal max,
             Pageable pageable
     );
 }

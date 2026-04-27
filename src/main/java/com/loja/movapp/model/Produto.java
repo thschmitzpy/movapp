@@ -2,6 +2,8 @@ package com.loja.movapp.model;
 
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "produtos")
 public class Produto {
@@ -19,50 +21,30 @@ public class Produto {
     @Column(name = "tamanho")
     private String tamanho;
 
-    @Column(name = "preco")
-    private double preco;
+    @Column(name = "preco", precision = 10, scale = 2)
+    private BigDecimal preco;
 
     @Column(name = "estoque")
     private int estoque;
 
-    @Column(name = "tecido")
-    private String tecido;
+    // Controla locking otimista: JPA inclui WHERE versao=? em cada UPDATE,
+    // garantindo que vendas simultâneas não corrompam o estoque.
+    @Version
+    @Column(name = "versao")
+    private Long versao;
 
-    @Column(name = "tiporoupa")
-    private String tipoRoupa;
+    public String getCodigo()  { return codigo;  }
+    public String getNome()    { return nome;    }
+    public String getCor()     { return cor;     }
+    public String getTamanho() { return tamanho; }
+    public BigDecimal getPreco()   { return preco;   }
+    public int        getEstoque() { return estoque; }
+    public Long       getVersao()  { return versao;  }
 
-    @Column(name = "modelagem")
-    private String modelagem;
-
-    @Column(name = "estilo")
-    private String estilo;
-
-    @Column(name = "genero")
-    private String genero;
-
-
-    public String getCodigo()    { return codigo;    }
-    public String getNome()      { return nome;      }
-    public String getCor()       { return cor;       }
-    public String getTamanho()   { return tamanho;   }
-    public double getPreco()     { return preco;     }
-    public int    getEstoque()   { return estoque;   }
-    public String getTecido()    { return tecido;    }
-    public String getTipoRoupa() { return tipoRoupa; }
-    public String getModelagem() { return modelagem; }
-    public String getEstilo()    { return estilo;    }
-    public String getGenero()    { return genero;    }
-
-
-    public void setCodigo(String codigo)       { this.codigo    = codigo;    }
-    public void setNome(String nome)           { this.nome      = nome;      }
-    public void setCor(String cor)             { this.cor       = cor;       }
-    public void setTamanho(String tamanho)     { this.tamanho   = tamanho;   }
-    public void setPreco(double preco)         { this.preco     = preco;     }
-    public void setEstoque(int estoque)        { this.estoque   = estoque;   }
-    public void setTecido(String tecido)       { this.tecido    = tecido;    }
-    public void setTipoRoupa(String tipoRoupa) { this.tipoRoupa = tipoRoupa; }
-    public void setModelagem(String modelagem) { this.modelagem = modelagem; }
-    public void setEstilo(String estilo)       { this.estilo    = estilo;    }
-    public void setGenero(String genero)       { this.genero    = genero;    }
+    public void setCodigo(String codigo)      { this.codigo  = codigo;  }
+    public void setNome(String nome)          { this.nome    = nome;    }
+    public void setCor(String cor)            { this.cor     = cor;     }
+    public void setTamanho(String tamanho)    { this.tamanho = tamanho; }
+    public void setPreco(BigDecimal preco)    { this.preco   = preco;   }
+    public void setEstoque(int estoque)       { this.estoque = estoque; }
 }
