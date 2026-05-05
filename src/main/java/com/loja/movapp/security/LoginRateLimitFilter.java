@@ -23,7 +23,7 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(LoginRateLimitFilter.class);
 
-    private static final int MAX_TENTATIVAS = 5;
+    private static final int MAX_TENTATIVAS = 20;
     private static final Duration JANELA = Duration.ofMinutes(1);
 
     private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();

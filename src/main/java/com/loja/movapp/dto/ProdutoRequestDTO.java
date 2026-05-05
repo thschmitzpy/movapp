@@ -23,7 +23,7 @@ public class ProdutoRequestDTO {
     @Size(max = 10, message = "Tamanho deve ter no máximo 10 caracteres")
     private String tamanho;
 
-    @DecimalMin(value = "0.00", message = "Preço não pode ser negativo")
+    @DecimalMin(value = "0.01", message = "Preço deve ser maior que zero")
     private BigDecimal preco;
 
     @Min(value = 0, message = "Estoque não pode ser negativo")

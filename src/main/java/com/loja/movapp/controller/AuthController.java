@@ -5,6 +5,8 @@ import com.loja.movapp.dto.LoginResponseDTO;
 import com.loja.movapp.security.JwtUtil;
 import com.loja.movapp.security.TokenBlacklist;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -43,6 +45,11 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(summary = "Login", description = "Retorna um token JWT válido por 24h")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Login realizado, token JWT retornado"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos (usuário ou senha em branco)"),
+            @ApiResponse(responseCode = "401", description = "Credenciais incorretas")
+    })
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequestDTO dto) {
         try {
             Authentication auth = authenticationManager.authenticate(
@@ -60,7 +67,11 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "Logout", description = "Invalida o token JWT atual")
+    @Operation(summary = "Logout", description = "Invalida o token JWT atual adicionando-o à blacklist")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Logout realizado com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token ausente ou inválido")
+    })
     public ResponseEntity<?> logout(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {

@@ -15,6 +15,9 @@ import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -111,6 +114,11 @@ public class ProdutoService {
         return repository.buscarPorFaixaDePreco(min, max, pageable).map(this::toDTO);
     }
 
+    @Retryable(
+            retryFor = ObjectOptimisticLockingFailureException.class,
+            maxAttempts = 4,
+            backoff = @Backoff(delay = 50, multiplier = 2, random = true)
+    )
     @Transactional
     @CachePut(value = "produtos", key = "#codigo")
     public ProdutoResponseDTO editar(String codigo, ProdutoRequestDTO dto) {

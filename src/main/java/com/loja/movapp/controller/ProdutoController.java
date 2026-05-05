@@ -42,6 +42,9 @@ public class ProdutoController {
 
     @GetMapping
     @Operation(summary = "Listar produtos paginado", description = "Filtra por nome quando o parâmetro 'nome' é informado")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de produtos retornada com sucesso")
+    })
     public ResponseEntity<Page<ProdutoResponseDTO>> listar(
             @Parameter(description = "Filtro parcial por nome (opcional)")
             @RequestParam(required = false) String nome,
@@ -93,6 +96,11 @@ public class ProdutoController {
     @GetMapping("/preco")
     @Operation(summary = "Buscar por faixa de preço",
             description = "Retorna produtos entre o preço mínimo e máximo com paginação")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Produtos encontrados na faixa"),
+            @ApiResponse(responseCode = "204", description = "Nenhum produto na faixa informada"),
+            @ApiResponse(responseCode = "400", description = "Faixa de preço inválida (negativa ou mín > máx)")
+    })
     public ResponseEntity<Page<ProdutoResponseDTO>> buscarPorFaixaDePreco(
             @Parameter(description = "Preço mínimo") @RequestParam BigDecimal min,
             @Parameter(description = "Preço máximo") @RequestParam BigDecimal max,

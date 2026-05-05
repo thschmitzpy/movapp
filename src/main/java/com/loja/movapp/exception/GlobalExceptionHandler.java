@@ -3,6 +3,7 @@ package com.loja.movapp.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -55,6 +56,17 @@ public class GlobalExceptionHandler {
                         request.getRequestURI()));
     }
 
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErroResponse> handleIntegridadeDados(
+            DataIntegrityViolationException ex, HttpServletRequest request) {
+
+        log.warn("Violação de integridade [{}]: {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErroResponse(HttpStatus.CONFLICT.value(),
+                        "Operação não permitida: o registro possui dados associados e não pode ser removido.",
+                        request.getRequestURI()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErroResponse> handleIllegalArgument(
             IllegalArgumentException ex, HttpServletRequest request) {
@@ -84,6 +96,7 @@ public class GlobalExceptionHandler {
         log.error("Erro interno [{}]: {}", request.getRequestURI(), ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErroResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                        "Erro interno: " + ex.getMessage(), request.getRequestURI()));
+                        "Ocorreu um erro interno.",
+                        request.getRequestURI()));
     }
 }

@@ -30,6 +30,9 @@ public class Venda {
     @Column(name = "status", nullable = false, columnDefinition = "varchar(20) default 'FECHADA'")
     private StatusVenda status;
 
+    @Column(name = "usuario")
+    private String usuario;
+
     @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ItemVenda> itens;
 
@@ -47,6 +50,8 @@ public class Venda {
     public void setFormaPagamento(String f)             { this.formaPagamento    = f;                 }
     public void setCondicaoPagamento(String c)          { this.condicaoPagamento = c;                 }
     public void setStatus(StatusVenda status)           { this.status            = status;            }
+    public String getUsuario()                          { return usuario;                             }
+    public void setUsuario(String usuario)              { this.usuario           = usuario;           }
     public void setItens(List<ItemVenda> itens)         { this.itens             = itens;             }
 }
 

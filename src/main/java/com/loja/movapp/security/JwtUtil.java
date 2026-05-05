@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 /**
  * Utilitário JWT: gera tokens de acesso, valida assinatura e extrai informações como
@@ -32,6 +33,7 @@ public class JwtUtil {
     public String generateToken(UserDetails userDetails) {
         String role = userDetails.getAuthorities().iterator().next().getAuthority();
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(userDetails.getUsername())
                 .claim("role", role)
                 .issuedAt(new Date())

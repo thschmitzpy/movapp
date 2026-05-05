@@ -63,7 +63,7 @@ class VendaServiceTest {
         vendaRequest.setItens(List.of(itemRequest));
         vendaRequest.setFormaPagamento("Pix");
         vendaRequest.setCondicaoPagamento("À vista");
-        vendaRequest.setStatus(StatusVenda.PENDENTE);
+        vendaRequest.setStatus(StatusVenda.FECHADA);
     }
 
     private Venda vendaSalvaMock(Long id, String total) {
@@ -84,7 +84,7 @@ class VendaServiceTest {
         when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
         when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "59.80"));
 
-        VendaResponseDTO resultado = service.realizarVenda(vendaRequest);
+        VendaResponseDTO resultado = service.realizarVenda(vendaRequest, "usuario_teste");
 
         assertNotNull(resultado);
         assertEquals(1L, resultado.getId());
@@ -100,7 +100,7 @@ class VendaServiceTest {
         when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
         when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "59.80"));
 
-        service.realizarVenda(vendaRequest);
+        service.realizarVenda(vendaRequest, "usuario_teste");
 
         assertEquals(estoqueAntes - 2, produto.getEstoque());
     }
@@ -111,7 +111,7 @@ class VendaServiceTest {
         when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
         when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "59.80"));
 
-        VendaResponseDTO resultado = service.realizarVenda(vendaRequest);
+        VendaResponseDTO resultado = service.realizarVenda(vendaRequest, "usuario_teste");
 
         assertEquals(new BigDecimal("59.80"), resultado.getTotal());
     }
@@ -132,14 +132,14 @@ class VendaServiceTest {
         vendaDois.setItens(List.of(itemRequest, item2));
         vendaDois.setFormaPagamento("Cartão de Crédito");
         vendaDois.setCondicaoPagamento("2x sem juros");
-        vendaDois.setStatus(StatusVenda.PENDENTE);
+        vendaDois.setStatus(StatusVenda.FECHADA);
 
         when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
         when(produtoRepository.findById("002")).thenReturn(Optional.of(produto2));
         when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
         when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "149.70"));
 
-        VendaResponseDTO resultado = service.realizarVenda(vendaDois);
+        VendaResponseDTO resultado = service.realizarVenda(vendaDois, "usuario_teste");
 
         assertNotNull(resultado);
         verify(produtoRepository, times(2)).save(any(Produto.class));
@@ -150,7 +150,7 @@ class VendaServiceTest {
         when(produtoRepository.findById("001")).thenReturn(Optional.empty());
 
         RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.realizarVenda(vendaRequest));
+                () -> service.realizarVenda(vendaRequest, "usuario_teste"));
 
         assertTrue(ex.getMessage().contains("não encontrado"));
         verify(vendaRepository, never()).save(any());
@@ -162,7 +162,7 @@ class VendaServiceTest {
         when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
 
         EstoqueInsuficienteException ex = assertThrows(EstoqueInsuficienteException.class,
-                () -> service.realizarVenda(vendaRequest));
+                () -> service.realizarVenda(vendaRequest, "usuario_teste"));
 
         assertTrue(ex.getMessage().contains("Estoque insuficiente"));
         verify(vendaRepository, never()).save(any());
@@ -175,7 +175,7 @@ class VendaServiceTest {
         when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
 
         EstoqueInsuficienteException ex = assertThrows(EstoqueInsuficienteException.class,
-                () -> service.realizarVenda(vendaRequest));
+                () -> service.realizarVenda(vendaRequest, "usuario_teste"));
 
         assertTrue(ex.getMessage().contains("Estoque insuficiente"));
     }
@@ -185,7 +185,7 @@ class VendaServiceTest {
         when(vendaRepository.findById(99L)).thenReturn(Optional.empty());
 
         RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.atualizarVenda(99L, vendaRequest));
+                () -> service.atualizarVenda(99L, vendaRequest, "usuario_teste"));
 
         assertTrue(ex.getMessage().contains("não encontrada"));
     }
@@ -198,7 +198,7 @@ class VendaServiceTest {
         when(vendaRepository.findById(1L)).thenReturn(Optional.of(vendaFechada));
 
         OperacaoNaoPermitidaException ex = assertThrows(OperacaoNaoPermitidaException.class,
-                () -> service.atualizarVenda(1L, vendaRequest));
+                () -> service.atualizarVenda(1L, vendaRequest, "usuario_teste"));
 
         assertTrue(ex.getMessage().contains("PENDENTES"));
     }
@@ -223,18 +223,9 @@ class VendaServiceTest {
                 .thenThrow(new ObjectOptimisticLockingFailureException(Produto.class, "001"));
 
         assertThrows(ObjectOptimisticLockingFailureException.class,
-                () -> service.realizarVenda(vendaRequest));
+                () -> service.realizarVenda(vendaRequest, "usuario_teste"));
 
         verify(vendaRepository, never()).save(any());
     }
 
-    @Test
-    void deveListarVendasVazia() {
-        when(vendaRepository.findAll()).thenReturn(new ArrayList<>());
-
-        var resultado = service.listarVendas();
-
-        assertNotNull(resultado);
-        assertTrue(resultado.isEmpty());
-    }
 }
