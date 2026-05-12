@@ -2,6 +2,7 @@ package com.loja.movapp.controller;
 
 import com.loja.movapp.dto.VendaRequestDTO;
 import com.loja.movapp.dto.VendaResponseDTO;
+import com.loja.movapp.service.IdempotencyService;
 import com.loja.movapp.service.VendaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -28,18 +29,34 @@ public class VendaController {
     @Autowired
     private VendaService service;
 
+    @Autowired
+    private IdempotencyService idempotencyService;
+
     @PostMapping
-    @Operation(summary = "Realizar venda", description = "Registra uma nova venda e atualiza o estoque")
+    @Operation(summary = "Realizar venda",
+            description = "Registra uma nova venda e atualiza o estoque. " +
+                    "Aceita o header opcional 'Idempotency-Key' (UUID) para garantir que retries " +
+                    "ou duplo-clique no cliente não criem vendas duplicadas — a primeira execução " +
+                    "é registrada e chamadas subsequentes com a mesma chave retornam a resposta cacheada.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Venda registrada com sucesso"),
+            @ApiResponse(responseCode = "200", description = "Venda registrada com sucesso (ou replay idempotente)"),
             @ApiResponse(responseCode = "400", description = "Dados inválidos"),
             @ApiResponse(responseCode = "404", description = "Produto não encontrado"),
-            @ApiResponse(responseCode = "409", description = "Estoque insuficiente ou conflito de concorrência")
+            @ApiResponse(responseCode = "409",
+                    description = "Estoque insuficiente, conflito de concorrência, " +
+                            "ou Idempotency-Key reutilizada com payload diferente / em processamento")
     })
     public ResponseEntity<VendaResponseDTO> realizarVenda(
             @Valid @RequestBody VendaRequestDTO dto,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.ok(service.realizarVenda(dto, userDetails.getUsername()));
+        VendaResponseDTO resposta = idempotencyService.executar(
+                idempotencyKey,
+                "POST /vendas",
+                dto,
+                () -> service.realizarVenda(dto, userDetails.getUsername()),
+                VendaResponseDTO.class);
+        return ResponseEntity.ok(resposta);
     }
 
     @PutMapping("/{id}")

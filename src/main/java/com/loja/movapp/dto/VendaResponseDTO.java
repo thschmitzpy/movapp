@@ -1,5 +1,6 @@
 package com.loja.movapp.dto;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.loja.movapp.model.StatusVenda;
 
 import java.math.BigDecimal;
@@ -8,8 +9,9 @@ import java.util.List;
 
 /**
  * DTO de resposta para Venda.
- * Representa os dados que a API devolve após realizar uma venda.
- * Contém o id, data, total, status e a lista de itens vendidos.
+ * Contém id, data, total, status, itens e a lista de pagamentos.
+ * Os campos formaPagamento/condicaoPagamento são mantidos para compatibilidade
+ * (preenchidos com o único pagamento ou "MISTO" quando há múltiplas formas).
  */
 public class VendaResponseDTO {
 
@@ -21,10 +23,14 @@ public class VendaResponseDTO {
     private StatusVenda status;
     private String usuario;
     private List<ItemVendaResponseDTO> itens;
+    private List<PagamentoVendaResponseDTO> pagamentos;
 
+    @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
     public VendaResponseDTO(Long id, LocalDateTime data, BigDecimal total,
                             String formaPagamento, String condicaoPagamento,
-                            StatusVenda status, String usuario, List<ItemVendaResponseDTO> itens) {
+                            StatusVenda status, String usuario,
+                            List<ItemVendaResponseDTO> itens,
+                            List<PagamentoVendaResponseDTO> pagamentos) {
         this.id                = id;
         this.data              = data;
         this.total             = total;
@@ -33,14 +39,16 @@ public class VendaResponseDTO {
         this.status            = status;
         this.usuario           = usuario;
         this.itens             = itens;
+        this.pagamentos        = pagamentos;
     }
 
-    public Long getId()                          { return id;                }
-    public LocalDateTime getData()               { return data;              }
-    public BigDecimal getTotal()                 { return total;             }
-    public String getFormaPagamento()            { return formaPagamento;    }
-    public String getCondicaoPagamento()         { return condicaoPagamento; }
-    public StatusVenda getStatus()               { return status;            }
-    public String getUsuario()                   { return usuario;           }
-    public List<ItemVendaResponseDTO> getItens() { return itens;             }
+    public Long getId()                                  { return id;                }
+    public LocalDateTime getData()                       { return data;              }
+    public BigDecimal getTotal()                         { return total;             }
+    public String getFormaPagamento()                    { return formaPagamento;    }
+    public String getCondicaoPagamento()                 { return condicaoPagamento; }
+    public StatusVenda getStatus()                       { return status;            }
+    public String getUsuario()                           { return usuario;           }
+    public List<ItemVendaResponseDTO> getItens()         { return itens;             }
+    public List<PagamentoVendaResponseDTO> getPagamentos() { return pagamentos;      }
 }

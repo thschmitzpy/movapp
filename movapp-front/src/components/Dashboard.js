@@ -6,25 +6,26 @@ export default function Dashboard({ refreshAt, dataFiltro }) {
 
   const carregarMetricas = useCallback(async () => {
     try {
-      const hoje = dataFiltro || new Date().toISOString().slice(0, 10);
+      const paramsVendas = { size: 500, sort: 'id,desc' };
+      if (dataFiltro) paramsVendas.data = dataFiltro;
 
-      const [produtosRes, vendasDiaRes, vendasRecentesRes] = await Promise.all([
+      const [produtosRes, vendasFiltradasRes, vendasRecentesRes] = await Promise.all([
         api.get('/produtos', { params: { size: 1 } }),
-        api.get('/vendas', { params: { data: hoje, size: 500, sort: 'id,desc' } }),
+        api.get('/vendas', { params: paramsVendas }),
         api.get('/vendas', { params: { size: 200, sort: 'id,desc' } }),
       ]);
 
       const totalProdutos = produtosRes.data.totalElements || 0;
-      const vendasDoDia = vendasDiaRes.data.content || [];
+      const vendasFiltradas = vendasFiltradasRes.data.content || [];
       const vendasRecentes = vendasRecentesRes.data.content || [];
 
-      const vendasDia = vendasDoDia.filter(v => v.status === 'FECHADA');
+      const vendasDia = vendasFiltradas.filter(v => v.status === 'FECHADA');
       const vendasPendentes = vendasRecentes.filter(v => v.status === 'PENDENTE');
       const totalDia = vendasDia.reduce((acc, v) => acc + Number(v.total), 0);
 
       const dataLabel = dataFiltro
         ? new Date(dataFiltro + 'T00:00:00').toLocaleDateString('pt-BR')
-        : 'Hoje';
+        : 'Geral';
 
       setMetricas({
         totalProdutos,
@@ -38,7 +39,6 @@ export default function Dashboard({ refreshAt, dataFiltro }) {
     }
   }, [dataFiltro]);
 
-  // Carga inicial + atualização automática a cada 1 min
   useEffect(() => {
     carregarMetricas();
     const intervalo = setInterval(carregarMetricas, 60000);

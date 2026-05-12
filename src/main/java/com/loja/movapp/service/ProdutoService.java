@@ -50,6 +50,12 @@ public class ProdutoService {
     @Transactional
     @CachePut(value = "produtos", key = "#result.codigo")
     public ProdutoResponseDTO salvar(ProdutoRequestDTO dto) {
+        if (dto.getEstoque() == null) {
+            throw new IllegalArgumentException("Estoque é obrigatório no cadastro de produto.");
+        }
+        if (dto.getPreco() == null) {
+            throw new IllegalArgumentException("Preço é obrigatório no cadastro de produto.");
+        }
         if (repository.existsById(dto.getCodigo())) {
             log.warn("Cadastro bloqueado: código '{}' já existe", dto.getCodigo());
             throw new OperacaoNaoPermitidaException(
@@ -133,7 +139,7 @@ public class ProdutoService {
         if (dto.getCor()     != null) p.setCor(dto.getCor());
         if (dto.getTamanho() != null) p.setTamanho(dto.getTamanho());
         if (dto.getPreco()   != null && dto.getPreco().compareTo(BigDecimal.ZERO) > 0) p.setPreco(dto.getPreco());
-        if (dto.getEstoque() >= 0)    p.setEstoque(dto.getEstoque());
+        if (dto.getEstoque() != null && dto.getEstoque() >= 0) p.setEstoque(dto.getEstoque());
 
         ProdutoResponseDTO atualizado = toDTO(repository.save(p));
         log.info("Produto atualizado: codigo={}", codigo);

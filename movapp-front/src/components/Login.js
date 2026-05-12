@@ -17,7 +17,11 @@ export default function Login({ onLogin }) {
       localStorage.setItem('usuario', JSON.stringify({ username: res.data.username, role: res.data.role }));
       onLogin(res.data);
     } catch (err) {
-      setErro(err.response?.data || 'Erro ao conectar com o servidor.');
+      const data = err.response?.data;
+      const msg = typeof data === 'string'
+        ? data
+        : (data?.mensagem || data?.message || 'Erro ao conectar com o servidor.');
+      setErro(msg);
     } finally {
       setCarregando(false);
     }

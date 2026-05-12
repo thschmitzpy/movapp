@@ -2,6 +2,7 @@ package com.loja.movapp.controller;
 
 import com.loja.movapp.dto.LoginRequestDTO;
 import com.loja.movapp.dto.LoginResponseDTO;
+import com.loja.movapp.exception.ErroResponse;
 import com.loja.movapp.security.JwtUtil;
 import com.loja.movapp.security.TokenBlacklist;
 import io.swagger.v3.oas.annotations.Operation;
@@ -62,7 +63,8 @@ public class AuthController {
             return ResponseEntity.ok(new LoginResponseDTO(token, userDetails.getUsername(), role));
         } catch (BadCredentialsException e) {
             log.warn("Tentativa de login falhou: username={}", dto.getUsername());
-            return ResponseEntity.status(401).body("Credenciais inválidas");
+            return ResponseEntity.status(401)
+                    .body(new ErroResponse(401, "Credenciais inválidas", "/auth/login"));
         }
     }
 

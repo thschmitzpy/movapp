@@ -8,7 +8,7 @@ import './App.css';
 
 const ABAS = [
   { id: 'cadastro', label: 'Cadastro de Produtos' },
-  { id: 'venda', label: 'Realizar Venda' },
+  { id: 'venda', label: 'Loja PDV' },
 ];
 
 function App() {

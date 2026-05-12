@@ -1,5 +1,7 @@
 package com.loja.movapp.security;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
@@ -15,7 +17,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @Order(1)
@@ -26,7 +27,11 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     private static final int MAX_TENTATIVAS = 20;
     private static final Duration JANELA = Duration.ofMinutes(1);
 
-    private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
+
+    private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
+            .expireAfterAccess(Duration.ofMinutes(10))
+            .maximumSize(10_000)
+            .build();
 
     private Bucket criarBucket() {
         return Bucket.builder()
@@ -45,7 +50,7 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
         }
 
         String ip = request.getRemoteAddr();
-        Bucket bucket = buckets.computeIfAbsent(ip, k -> criarBucket());
+        Bucket bucket = buckets.get(ip, k -> criarBucket());
 
         if (bucket.tryConsume(1)) {
             chain.doFilter(request, response);

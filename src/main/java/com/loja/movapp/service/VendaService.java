@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -44,12 +45,11 @@ public class VendaService {
     @Transactional
     @CacheEvict(value = "produtos", allEntries = true)
     public VendaResponseDTO realizarVenda(VendaRequestDTO dto, String usuario) {
-        log.info("Iniciando venda: {} item(ns), pagamento={}, usuario={}", dto.getItens().size(), dto.getFormaPagamento(), usuario);
+        log.info("Iniciando venda: {} item(ns), {} pagamento(s), usuario={}",
+                dto.getItens().size(), dto.getPagamentos().size(), usuario);
 
         Venda venda = new Venda();
         venda.setData(LocalDateTime.now());
-        venda.setFormaPagamento(dto.getFormaPagamento());
-        venda.setCondicaoPagamento(dto.getCondicaoPagamento());
         venda.setStatus(dto.getStatus());
 
         List<ItemVenda> itens = new ArrayList<>();
@@ -96,17 +96,16 @@ public class VendaService {
             ));
         }
 
+        aplicarPagamentos(venda, dto.getPagamentos(), total);
+
         venda.setItens(itens);
         venda.setTotal(total);
         venda.setUsuario(usuario);
         Venda vendaSalva = vendaRepository.save(venda);
 
-        log.info("Venda registrada: id={}, total=R${}, status={}, usuario={}", vendaSalva.getId(), vendaSalva.getTotal(), vendaSalva.getStatus(), vendaSalva.getUsuario());
-        return new VendaResponseDTO(
-                vendaSalva.getId(), vendaSalva.getData(), vendaSalva.getTotal(),
-                vendaSalva.getFormaPagamento(), vendaSalva.getCondicaoPagamento(),
-                vendaSalva.getStatus(), vendaSalva.getUsuario(), itensResponse
-        );
+        log.info("Venda registrada: id={}, total=R${}, status={}, usuario={}",
+                vendaSalva.getId(), vendaSalva.getTotal(), vendaSalva.getStatus(), vendaSalva.getUsuario());
+        return toDTOComItens(vendaSalva, itensResponse);
     }
 
     @Retryable(
@@ -134,7 +133,6 @@ public class VendaService {
             throw new OperacaoNaoPermitidaException("Apenas vendas PENDENTES podem ser alteradas!");
         }
 
-        // Venda estava PENDENTE: itens não descontaram estoque, apenas limpa a lista
         venda.getItens().clear();
 
         List<ItemVendaResponseDTO> itensResponse = new ArrayList<>();
@@ -177,20 +175,18 @@ public class VendaService {
             ));
         }
 
+        venda.getPagamentos().clear();
+        aplicarPagamentos(venda, dto.getPagamentos(), total);
+
         venda.setTotal(total);
-        venda.setFormaPagamento(dto.getFormaPagamento());
-        venda.setCondicaoPagamento(dto.getCondicaoPagamento());
         venda.setStatus(dto.getStatus());
         venda.setUsuario(usuario);
 
         Venda vendaSalva = vendaRepository.save(venda);
-        log.info("Venda atualizada: id={}, total=R${}, status={}, usuario={}", vendaSalva.getId(), vendaSalva.getTotal(), vendaSalva.getStatus(), vendaSalva.getUsuario());
+        log.info("Venda atualizada: id={}, total=R${}, status={}, usuario={}",
+                vendaSalva.getId(), vendaSalva.getTotal(), vendaSalva.getStatus(), vendaSalva.getUsuario());
 
-        return new VendaResponseDTO(
-                vendaSalva.getId(), vendaSalva.getData(), vendaSalva.getTotal(),
-                vendaSalva.getFormaPagamento(), vendaSalva.getCondicaoPagamento(),
-                vendaSalva.getStatus(), vendaSalva.getUsuario(), itensResponse
-        );
+        return toDTOComItens(vendaSalva, itensResponse);
     }
 
     @Retryable(
@@ -246,9 +242,50 @@ public class VendaService {
             throw new OperacaoNaoPermitidaException("Apenas vendas PENDENTES podem ser excluídas!");
         }
 
-        // Vendas PENDENTES não descontam estoque, portanto não há nada a restaurar
         vendaRepository.delete(venda);
         log.info("Venda PENDENTE excluída: id={}", id);
+    }
+
+
+    private void aplicarPagamentos(Venda venda, List<PagamentoVendaRequestDTO> pagsReq, BigDecimal total) {
+        // Valores monetários: comparar sempre com escala 2 (HALF_UP) para evitar
+        // que jitter de ponto flutuante vindo do cliente (ex.: 189.89000000000001)
+        // dispare falso negativo contra o total calculado em BigDecimal no backend.
+        BigDecimal totalNormalizado = total.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal soma = pagsReq.stream()
+                .map(PagamentoVendaRequestDTO::getValor)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        if (soma.compareTo(totalNormalizado) != 0) {
+            throw new OperacaoNaoPermitidaException(
+                    "Soma das formas de pagamento (R$ " + soma +
+                            ") difere do total da venda (R$ " + totalNormalizado + ")");
+        }
+
+        for (PagamentoVendaRequestDTO p : pagsReq) {
+            PagamentoVenda pv = new PagamentoVenda();
+            pv.setVenda(venda);
+            pv.setFormaPagamento(p.getFormaPagamento());
+            pv.setCondicaoPagamento(p.getCondicaoPagamento());
+            pv.setValor(p.getValor().setScale(2, RoundingMode.HALF_UP));
+            venda.getPagamentos().add(pv);
+        }
+
+        if (pagsReq.size() == 1) {
+            venda.setFormaPagamento(pagsReq.get(0).getFormaPagamento());
+            venda.setCondicaoPagamento(pagsReq.get(0).getCondicaoPagamento());
+        } else {
+            venda.setFormaPagamento("MISTO");
+            venda.setCondicaoPagamento(null);
+        }
+    }
+
+    private VendaResponseDTO toDTOComItens(Venda v, List<ItemVendaResponseDTO> itens) {
+        return new VendaResponseDTO(
+                v.getId(), v.getData(), v.getTotal(),
+                v.getFormaPagamento(), v.getCondicaoPagamento(),
+                v.getStatus(), v.getUsuario(), itens, mapPagamentos(v));
     }
 
     private VendaResponseDTO toDTO(Venda v) {
@@ -259,7 +296,18 @@ public class VendaService {
                 )).toList();
         return new VendaResponseDTO(
                 v.getId(), v.getData(), v.getTotal(),
-                v.getFormaPagamento(), v.getCondicaoPagamento(), v.getStatus(), v.getUsuario(), itens);
+                v.getFormaPagamento(), v.getCondicaoPagamento(),
+                v.getStatus(), v.getUsuario(), itens, mapPagamentos(v));
+    }
+
+    private List<PagamentoVendaResponseDTO> mapPagamentos(Venda v) {
+        if (v.getPagamentos() == null || v.getPagamentos().isEmpty()) {
+            return List.of();
+        }
+        return v.getPagamentos().stream()
+                .map(p -> new PagamentoVendaResponseDTO(
+                        p.getFormaPagamento(), p.getCondicaoPagamento(), p.getValor()))
+                .toList();
     }
 
     public Page<VendaResponseDTO> buscarPorFiltros(Long id, LocalDate data, Pageable pageable) {
@@ -269,9 +317,10 @@ public class VendaService {
                     .orElse(Page.empty(pageable));
         }
         if (data != null) {
+
             LocalDateTime inicio = data.atStartOfDay();
-            LocalDateTime fim    = data.atTime(23, 59, 59);
-            return vendaRepository.findByDataBetween(inicio, fim, pageable).map(this::toDTO);
+            LocalDateTime fim    = data.plusDays(1).atStartOfDay();
+            return vendaRepository.buscarNoIntervalo(inicio, fim, pageable).map(this::toDTO);
         }
         return listarVendasPaginado(pageable);
     }

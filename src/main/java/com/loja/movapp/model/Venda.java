@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -36,13 +37,17 @@ public class Venda {
     @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ItemVenda> itens;
 
-    public Long getId()                    { return id;                }
-    public LocalDateTime getData()         { return data;              }
-    public BigDecimal getTotal()           { return total;             }
-    public String getFormaPagamento()      { return formaPagamento;    }
-    public String getCondicaoPagamento()   { return condicaoPagamento; }
-    public StatusVenda getStatus()         { return status;            }
-    public List<ItemVenda> getItens()      { return itens;             }
+    @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PagamentoVenda> pagamentos = new ArrayList<>();
+
+    public Long getId()                       { return id;                }
+    public LocalDateTime getData()            { return data;              }
+    public BigDecimal getTotal()              { return total;             }
+    public String getFormaPagamento()         { return formaPagamento;    }
+    public String getCondicaoPagamento()      { return condicaoPagamento; }
+    public StatusVenda getStatus()            { return status;            }
+    public List<ItemVenda> getItens()         { return itens;             }
+    public List<PagamentoVenda> getPagamentos() { return pagamentos;      }
 
     public void setId(Long id)                          { this.id                = id;                }
     public void setData(LocalDateTime data)             { this.data              = data;              }
@@ -53,5 +58,6 @@ public class Venda {
     public String getUsuario()                          { return usuario;                             }
     public void setUsuario(String usuario)              { this.usuario           = usuario;           }
     public void setItens(List<ItemVenda> itens)         { this.itens             = itens;             }
+    public void setPagamentos(List<PagamentoVenda> pagamentos) { this.pagamentos  = pagamentos;       }
 }
 

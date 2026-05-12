@@ -27,19 +27,19 @@ public class ProdutoRequestDTO {
     private BigDecimal preco;
 
     @Min(value = 0, message = "Estoque não pode ser negativo")
-    private int estoque;
+    private Integer estoque;
 
     public String getCodigo()  { return codigo;  }
     public String getNome()    { return nome;    }
     public String getCor()     { return cor;     }
     public String getTamanho() { return tamanho; }
     public BigDecimal getPreco() { return preco;   }
-    public int    getEstoque() { return estoque; }
+    public Integer getEstoque() { return estoque; }
 
     public void setCodigo(String codigo)   { this.codigo  = codigo;  }
     public void setNome(String nome)       { this.nome    = nome;    }
     public void setCor(String cor)         { this.cor     = cor;     }
     public void setTamanho(String tamanho) { this.tamanho = tamanho; }
     public void setPreco(BigDecimal preco) { this.preco   = preco;   }
-    public void setEstoque(int estoque)    { this.estoque = estoque; }
+    public void setEstoque(Integer estoque) { this.estoque = estoque; }
 }

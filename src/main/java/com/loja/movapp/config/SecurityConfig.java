@@ -1,5 +1,7 @@
 package com.loja.movapp.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.loja.movapp.exception.ErroResponse;
 import com.loja.movapp.security.JwtAuthenticationFilter;
 import com.loja.movapp.security.LoginRateLimitFilter;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,6 +10,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -37,6 +40,9 @@ public class SecurityConfig {
     @Lazy
     @Autowired
     private LoginRateLimitFilter loginRateLimitFilter;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Value("${app.admin.username}")
     private String adminUsername;
@@ -81,13 +87,17 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(401);
-                            response.setContentType("application/json");
-                            response.getWriter().write("{\"erro\":\"Não autenticado\"}");
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding("UTF-8");
+                            objectMapper.writeValue(response.getWriter(),
+                                    new ErroResponse(401, "Não autenticado", request.getRequestURI()));
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
                             response.setStatus(403);
-                            response.setContentType("application/json");
-                            response.getWriter().write("{\"erro\":\"Acesso negado\"}");
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding("UTF-8");
+                            objectMapper.writeValue(response.getWriter(),
+                                    new ErroResponse(403, "Acesso negado", request.getRequestURI()));
                         })
                 )
                 .authorizeHttpRequests(auth -> auth

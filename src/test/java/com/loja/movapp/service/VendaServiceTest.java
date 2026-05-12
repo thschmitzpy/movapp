@@ -1,6 +1,7 @@
 package com.loja.movapp.service;
 
 import com.loja.movapp.dto.ItemVendaRequestDTO;
+import com.loja.movapp.dto.PagamentoVendaRequestDTO;
 import com.loja.movapp.dto.VendaRequestDTO;
 import com.loja.movapp.dto.VendaResponseDTO;
 import com.loja.movapp.exception.EstoqueInsuficienteException;
@@ -61,9 +62,16 @@ class VendaServiceTest {
 
         vendaRequest = new VendaRequestDTO();
         vendaRequest.setItens(List.of(itemRequest));
-        vendaRequest.setFormaPagamento("Pix");
-        vendaRequest.setCondicaoPagamento("À vista");
+        vendaRequest.setPagamentos(List.of(pagamento("Pix", "À vista", "59.80")));
         vendaRequest.setStatus(StatusVenda.FECHADA);
+    }
+
+    private PagamentoVendaRequestDTO pagamento(String forma, String condicao, String valor) {
+        PagamentoVendaRequestDTO p = new PagamentoVendaRequestDTO();
+        p.setFormaPagamento(forma);
+        p.setCondicaoPagamento(condicao);
+        p.setValor(new BigDecimal(valor));
+        return p;
     }
 
     private Venda vendaSalvaMock(Long id, String total) {
@@ -80,7 +88,7 @@ class VendaServiceTest {
 
     @Test
     void deveRealizarVendaComSucesso() {
-        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
+        when(produtoRepository.buscarParaAtualizacaoEstoque("001")).thenReturn(Optional.of(produto));
         when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
         when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "59.80"));
 
@@ -96,7 +104,7 @@ class VendaServiceTest {
     void deveDescontarEstoqueAoRealizarVenda() {
         int estoqueAntes = produto.getEstoque();
 
-        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
+        when(produtoRepository.buscarParaAtualizacaoEstoque("001")).thenReturn(Optional.of(produto));
         when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
         when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "59.80"));
 
@@ -107,7 +115,7 @@ class VendaServiceTest {
 
     @Test
     void deveCalcularTotalCorretamente() {
-        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
+        when(produtoRepository.buscarParaAtualizacaoEstoque("001")).thenReturn(Optional.of(produto));
         when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
         when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "59.80"));
 
@@ -130,12 +138,11 @@ class VendaServiceTest {
 
         VendaRequestDTO vendaDois = new VendaRequestDTO();
         vendaDois.setItens(List.of(itemRequest, item2));
-        vendaDois.setFormaPagamento("Cartão de Crédito");
-        vendaDois.setCondicaoPagamento("2x sem juros");
+        vendaDois.setPagamentos(List.of(pagamento("Cartão de Crédito", "2x sem juros", "149.70")));
         vendaDois.setStatus(StatusVenda.FECHADA);
 
-        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
-        when(produtoRepository.findById("002")).thenReturn(Optional.of(produto2));
+        when(produtoRepository.buscarParaAtualizacaoEstoque("001")).thenReturn(Optional.of(produto));
+        when(produtoRepository.buscarParaAtualizacaoEstoque("002")).thenReturn(Optional.of(produto2));
         when(produtoRepository.save(any(Produto.class))).thenReturn(produto);
         when(vendaRepository.save(any(Venda.class))).thenReturn(vendaSalvaMock(1L, "149.70"));
 
@@ -147,7 +154,7 @@ class VendaServiceTest {
 
     @Test
     void deveLancarRecursoNaoEncontradoQuandoProdutoInexistente() {
-        when(produtoRepository.findById("001")).thenReturn(Optional.empty());
+        when(produtoRepository.buscarParaAtualizacaoEstoque("001")).thenReturn(Optional.empty());
 
         RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
                 () -> service.realizarVenda(vendaRequest, "usuario_teste"));
@@ -159,7 +166,7 @@ class VendaServiceTest {
     @Test
     void deveLancarEstoqueInsuficienteQuandoQuantidadeMaiorQueEstoque() {
         produto.setEstoque(1);
-        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
+        when(produtoRepository.buscarParaAtualizacaoEstoque("001")).thenReturn(Optional.of(produto));
 
         EstoqueInsuficienteException ex = assertThrows(EstoqueInsuficienteException.class,
                 () -> service.realizarVenda(vendaRequest, "usuario_teste"));
@@ -172,7 +179,7 @@ class VendaServiceTest {
     @Test
     void deveLancarEstoqueInsuficienteQuandoEstoqueZero() {
         produto.setEstoque(0);
-        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
+        when(produtoRepository.buscarParaAtualizacaoEstoque("001")).thenReturn(Optional.of(produto));
 
         EstoqueInsuficienteException ex = assertThrows(EstoqueInsuficienteException.class,
                 () -> service.realizarVenda(vendaRequest, "usuario_teste"));
@@ -218,7 +225,7 @@ class VendaServiceTest {
 
     @Test
     void devePropagaExcecaoDeConcorrenciaAoSalvarProduto() {
-        when(produtoRepository.findById("001")).thenReturn(Optional.of(produto));
+        when(produtoRepository.buscarParaAtualizacaoEstoque("001")).thenReturn(Optional.of(produto));
         when(produtoRepository.save(any(Produto.class)))
                 .thenThrow(new ObjectOptimisticLockingFailureException(Produto.class, "001"));
 

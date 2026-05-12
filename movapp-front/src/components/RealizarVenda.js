@@ -16,7 +16,22 @@ const LABEL_FORMA = {
   CARTAO_CREDITO: 'Cartão de Crédito',
   CARTAO_DEBITO:  'Cartão de Débito',
   PIX:            'PIX',
+  MISTO:          'Múltiplas formas',
 };
+
+let _uidPag = 0;
+const novoUid = () => `p${++_uidPag}_${Date.now()}`;
+
+// UUID v4 para a chave de idempotência. Usa crypto.randomUUID quando disponível
+// (browsers modernos / contextos seguros) e cai em fallback caso contrário.
+const novaIdempotencyKey = () =>
+  (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+
+function pagamentoVazio(valor = '') {
+  return { uid: novoUid(), formaPagamento: '', condicaoPagamento: '', valor };
+}
 
 const LABEL_CONDICAO = {
   A_VISTA:       'À Vista',
@@ -41,12 +56,16 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
   const [codigoBusca, setCodigoBusca] = useState('');
   const [quantidade, setQuantidade] = useState('');
   const [produtoBuscado, setProdutoBuscado] = useState(null);
-  const [formaPagamento, setFormaPagamento] = useState('');
-  const [condicaoPagamento, setCondicaoPagamento] = useState('');
+  const [pagamentos, setPagamentos] = useState([pagamentoVazio()]);
   const [mensagem, setMensagem] = useState(null);
   const [vendas, setVendas] = useState([]);
   const [buscandoProduto, setBuscandoProduto] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  // Chave de idempotência da finalização em curso. Gerada na 1ª tentativa e
+  // mantida durante retries (erro de rede / 5xx) para que o backend reconheça
+  // a mesma intenção e não duplique a venda. Resetada em sucesso e em erros
+  // 4xx (que indicam que o usuário precisa corrigir e enviar uma nova venda).
+  const idempotencyKeyRef = useRef(null);
   const [vendaEditando, setVendaEditando] = useState(null); // venda PENDENTE em edição
   const [vendaExpandida, setVendaExpandida] = useState(null); // id da venda com itens visíveis
   const [filtroStatus, setFiltroStatus] = useState('TODAS');
@@ -91,8 +110,20 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
       preco: i.precoUnit,
       quantidade: i.quantidade,
     })));
-    setFormaPagamento(venda.formaPagamento || '');
-    setCondicaoPagamento(venda.condicaoPagamento || '');
+    const pagsBackend = venda.pagamentos?.length
+      ? venda.pagamentos.map(p => ({
+          uid: novoUid(),
+          formaPagamento: p.formaPagamento || '',
+          condicaoPagamento: p.condicaoPagamento || '',
+          valor: p.valor != null ? String(p.valor) : '',
+        }))
+      : [{
+          uid: novoUid(),
+          formaPagamento: venda.formaPagamento || '',
+          condicaoPagamento: venda.condicaoPagamento || '',
+          valor: venda.total != null ? String(venda.total) : '',
+        }];
+    setPagamentos(pagsBackend);
     setProdutoBuscado(null);
     setCodigoBusca('');
     setQuantidade('');
@@ -102,8 +133,7 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
   function cancelarEdicao() {
     setVendaEditando(null);
     setItens([]);
-    setFormaPagamento('');
-    setCondicaoPagamento('');
+    setPagamentos([pagamentoVazio()]);
     setProdutoBuscado(null);
     setCodigoBusca('');
     setQuantidade('');
@@ -174,26 +204,106 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
     setItens(itens.map(i => i.codigoProduto === codigo ? { ...i, quantidade: qtd } : i));
   }
 
-  function handleFormaPagamento(novaForma) {
-    setFormaPagamento(novaForma);
-    const condicoesPermitidas = CONDICOES_POR_FORMA[novaForma] ?? [];
-    if (!condicoesPermitidas.includes(condicaoPagamento)) {
-      setCondicaoPagamento(condicoesPermitidas.length === 1 ? condicoesPermitidas[0] : '');
-    }
+  function atualizarPagamento(idx, campo, valor) {
+    setPagamentos(prev => prev.map((p, i) => {
+      if (i !== idx) return p;
+      const next = { ...p, [campo]: valor };
+      if (campo === 'formaPagamento') {
+        const condicoesPermitidas = CONDICOES_POR_FORMA[valor] ?? [];
+        if (!condicoesPermitidas.includes(next.condicaoPagamento)) {
+          next.condicaoPagamento = condicoesPermitidas.length === 1 ? condicoesPermitidas[0] : '';
+        }
+      }
+      return next;
+    }));
+  }
+
+  function adicionarPagamento() {
+    setPagamentos(prev => {
+      // Indo de 1 → 2: o primeiro passa a ter o total como valor explícito,
+      // e o segundo é criado em branco para o vendedor preencher.
+      if (prev.length === 1) {
+        const valorPrimeiro = total > 0 ? total.toFixed(2) : '';
+        return [{ ...prev[0], valor: valorPrimeiro }, pagamentoVazio('')];
+      }
+      const jaAlocado = prev.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
+      const restanteAtual = Math.max(0, total - jaAlocado);
+      return [...prev, pagamentoVazio(restanteAtual ? restanteAtual.toFixed(2) : '')];
+    });
+  }
+
+  function removerPagamento(idx) {
+    setPagamentos(prev => {
+      if (prev.length === 1) return prev;
+      const restantes = prev.filter((_, i) => i !== idx);
+      if (restantes.length === 1) return [{ ...restantes[0], valor: '' }];
+      return restantes;
+    });
+  }
+
+  function preencherRestante(idx) {
+    setPagamentos(prev => {
+      const outras = prev.reduce((acc, p, i) => i === idx ? acc : acc + (Number(p.valor) || 0), 0);
+      const falta = Math.max(0, total - outras);
+      return prev.map((p, i) => i === idx ? { ...p, valor: falta.toFixed(2) } : p);
+    });
   }
 
   const total = itens.reduce((acc, i) => acc + i.preco * i.quantidade, 0);
+  const pagamentoUnico = pagamentos.length === 1;
+  // Para 1 forma de pagamento, o valor é implícito = total da venda.
+  // Para múltiplas, soma o que o vendedor digitou em cada linha.
+  const somaPagamentos = pagamentoUnico ? total : pagamentos.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
+  const restante = +(total - somaPagamentos).toFixed(2);
+  const pagamentoIncompleto = pagamentos.some(p => !p.formaPagamento || !p.condicaoPagamento);
 
   async function handleSubmit(statusVenda) {
     if (itens.length === 0) { exibirMensagem('Adicione pelo menos 1 item.', 'erro'); return; }
-    if (!formaPagamento) { exibirMensagem('Selecione a forma de pagamento.', 'erro'); return; }
-    if (!condicaoPagamento) { exibirMensagem('Selecione a condição de pagamento.', 'erro'); return; }
+
+    const pagsValidos = pagamentos.filter(p =>
+      p.formaPagamento || p.condicaoPagamento || (p.valor && Number(p.valor) > 0)
+    );
+
+    if (pagsValidos.length === 0) { exibirMensagem('Informe ao menos uma forma de pagamento.', 'erro'); return; }
+
+    if (pagsValidos.length !== pagamentos.length) {
+      setPagamentos(pagsValidos.length === 1 ? [{ ...pagsValidos[0], valor: '' }] : pagsValidos);
+    }
+
+    const ehUnico = pagsValidos.length === 1;
+
+    for (const p of pagsValidos) {
+      if (!p.formaPagamento) { exibirMensagem('Selecione a forma em todos os pagamentos.', 'erro'); return; }
+      if (!p.condicaoPagamento) { exibirMensagem('Selecione a condição em todos os pagamentos.', 'erro'); return; }
+    }
+
+    // Valor só precisa ser validado quando há mais de uma forma de pagamento
+    // (com forma única, o valor é implícito = total da venda).
+    if (!ehUnico) {
+      for (const p of pagsValidos) {
+        if (!p.valor || Number(p.valor) <= 0) { exibirMensagem('Informe um valor maior que zero em cada pagamento.', 'erro'); return; }
+      }
+      const soma = pagsValidos.reduce((acc, p) => acc + Number(p.valor), 0);
+      const restanteCalc = +(total - soma).toFixed(2);
+      if (Math.abs(restanteCalc) > 0.001) {
+        exibirMensagem(
+          restanteCalc > 0
+            ? `Faltam R$ ${restanteCalc.toFixed(2)} para fechar o total da venda.`
+            : `Pagamentos excedem o total em R$ ${Math.abs(restanteCalc).toFixed(2)}.`,
+          'erro'
+        );
+        return;
+      }
+    }
 
     setEnviando(true);
     const body = {
       itens: itens.map(i => ({ codigoProduto: i.codigoProduto, quantidade: i.quantidade })),
-      formaPagamento,
-      condicaoPagamento,
+      pagamentos: pagsValidos.map(p => ({
+        formaPagamento: p.formaPagamento,
+        condicaoPagamento: p.condicaoPagamento,
+        valor: ehUnico ? total : Number(p.valor),
+      })),
       status: statusVenda,
     };
 
@@ -205,13 +315,25 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
           : `Venda #${vendaEditando.id} atualizada e mantida como pendente.`
         );
       } else {
-        await api.post('/vendas', body);
+        if (!idempotencyKeyRef.current) {
+          idempotencyKeyRef.current = novaIdempotencyKey();
+        }
+        await api.post('/vendas', body, {
+          headers: { 'Idempotency-Key': idempotencyKeyRef.current },
+        });
         exibirMensagem('Venda realizada com sucesso!');
       }
+      idempotencyKeyRef.current = null;
       cancelarEdicao();
       carregarVendas();
       onVendaAtualizada?.();
     } catch (err) {
+      const status = err.response?.status;
+      // 4xx → cliente precisa corrigir o payload, próxima tentativa é uma nova intenção.
+      // 5xx / sem resposta (rede) → mantém a chave para retry seguro.
+      if (status && status >= 400 && status < 500) {
+        idempotencyKeyRef.current = null;
+      }
       const data = err.response?.data;
       const msg = typeof data === 'string' ? data : data?.mensagem || data?.message || data?.erro || 'Erro ao salvar venda.';
       exibirMensagem(msg, 'erro');
@@ -363,28 +485,94 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
 
         <div className="form-pagamento">
           <h3>Pagamento</h3>
-          <div className="form-grid">
-            <div className="campo">
-              <label>Forma de Pagamento *</label>
-              <select value={formaPagamento} onChange={e => handleFormaPagamento(e.target.value)}>
-                <option value="">Selecione...</option>
-                {FORMAS_PAGAMENTO.map(f => <option key={f} value={f}>{labelForma(f)}</option>)}
-              </select>
+
+          {pagamentos.map((p, idx) => (
+            <div key={p.uid} className="pagamento-linha">
+              <div className="campo">
+                <label>Forma *</label>
+                <select
+                  value={p.formaPagamento}
+                  onChange={e => atualizarPagamento(idx, 'formaPagamento', e.target.value)}
+                >
+                  <option value="">Selecione...</option>
+                  {FORMAS_PAGAMENTO.map(f => <option key={f} value={f}>{labelForma(f)}</option>)}
+                </select>
+              </div>
+              <div className="campo">
+                <label>Condição *</label>
+                <select
+                  value={p.condicaoPagamento}
+                  onChange={e => atualizarPagamento(idx, 'condicaoPagamento', e.target.value)}
+                  disabled={!p.formaPagamento}
+                >
+                  <option value="">Selecione...</option>
+                  {(CONDICOES_POR_FORMA[p.formaPagamento] ?? CONDICOES_PAGAMENTO).map(c => (
+                    <option key={c} value={c}>{labelCondicao(c)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="campo">
+                <label>Valor R$ {!pagamentoUnico && '*'}</label>
+                <div className="campo-valor-linha">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={pagamentoUnico ? (total > 0 ? total.toFixed(2) : '') : p.valor}
+                    onChange={e => atualizarPagamento(idx, 'valor', e.target.value)}
+                    disabled={pagamentoUnico}
+                    title={pagamentoUnico ? 'Pagamento único — valor é o total da venda' : ''}
+                  />
+                  {!pagamentoUnico && (
+                    <button
+                      type="button"
+                      className="btn-secundario btn-preencher"
+                      onClick={() => preencherRestante(idx)}
+                      title="Preencher com o restante"
+                      disabled={total <= 0}
+                    >
+                      =
+                    </button>
+                  )}
+                </div>
+              </div>
+              {pagamentos.length > 1 && (
+                <button
+                  type="button"
+                  className="btn-excluir btn-remover-pag"
+                  onClick={() => removerPagamento(idx)}
+                  title="Remover esta forma de pagamento"
+                >
+                  ×
+                </button>
+              )}
             </div>
-            <div className="campo">
-              <label>Condição de Pagamento *</label>
-              <select
-                value={condicaoPagamento}
-                onChange={e => setCondicaoPagamento(e.target.value)}
-                disabled={!formaPagamento}
-              >
-                <option value="">Selecione...</option>
-                {(CONDICOES_POR_FORMA[formaPagamento] ?? CONDICOES_PAGAMENTO).map(c => (
-                  <option key={c} value={c}>{labelCondicao(c)}</option>
-                ))}
-              </select>
-            </div>
+          ))}
+
+          <div className="pagamento-acoes">
+            <button
+              type="button"
+              className="btn-secundario"
+              onClick={adicionarPagamento}
+              disabled={itens.length === 0 || pagamentoIncompleto}
+              title={pagamentoIncompleto ? 'Preencha forma e condição dos pagamentos atuais antes de adicionar outro' : ''}
+            >
+              + Adicionar forma de pagamento
+            </button>
           </div>
+
+          {!pagamentoUnico && (
+            <div className="resumo-pagamento">
+              <div>Total da venda: <strong>R$ {total.toFixed(2)}</strong></div>
+              <div>Total informado: <strong>R$ {somaPagamentos.toFixed(2)}</strong></div>
+              <div className={Math.abs(restante) > 0.001 ? 'restante-erro' : 'restante-ok'}>
+                {restante > 0 && <>Restante: <strong>R$ {restante.toFixed(2)}</strong></>}
+                {restante < 0 && <>Excedente: <strong>R$ {Math.abs(restante).toFixed(2)}</strong></>}
+                {Math.abs(restante) <= 0.001 && total > 0 && <>✓ Pagamento completo</>}
+              </div>
+            </div>
+          )}
+
           <div className="botoes-venda">
             <button
               type="button"
@@ -562,6 +750,30 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
                                   </tr>
                                 </tfoot>
                               </table>
+
+                              {v.pagamentos?.length > 1 && (
+                                <table className="tabela-itens tabela-pagamentos">
+                                  <thead>
+                                    <tr>
+                                      <th colSpan={3}>Formas de pagamento</th>
+                                    </tr>
+                                    <tr>
+                                      <th>Forma</th>
+                                      <th>Condição</th>
+                                      <th>Valor</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {v.pagamentos.map((p, idx) => (
+                                      <tr key={idx}>
+                                        <td>{labelForma(p.formaPagamento)}</td>
+                                        <td>{p.condicaoPagamento ? labelCondicao(p.condicaoPagamento) : '—'}</td>
+                                        <td>R$ {Number(p.valor).toFixed(2)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
                             </div>
                           </td>
                         </tr>

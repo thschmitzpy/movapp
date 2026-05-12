@@ -590,6 +590,75 @@ input:disabled {
   margin-top: 4px;
 }
 
+.pagamento-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  padding: 10px 0;
+  border-bottom: 1px dashed #eee;
+}
+
+.pagamento-linha .campo {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.pagamento-linha:last-of-type {
+  border-bottom: none;
+}
+
+.campo-valor-linha {
+  display: flex;
+  gap: 6px;
+}
+
+.campo-valor-linha input {
+  flex: 1;
+}
+
+.btn-preencher {
+  padding: 6px 10px;
+  font-weight: 700;
+}
+
+.btn-remover-pag {
+  padding: 6px 12px;
+  font-size: 1.1rem;
+  height: fit-content;
+  align-self: end;
+  margin-bottom: 2px;
+}
+
+.pagamento-acoes {
+  margin-top: 10px;
+}
+
+.resumo-pagamento {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: #f9fafc;
+  border-radius: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  font-size: 0.95rem;
+}
+
+.restante-erro {
+  color: #c62828;
+  font-weight: 600;
+}
+
+.restante-ok {
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+.tabela-pagamentos {
+  margin-top: 14px;
+}
+
 /* ── Alertas ───────────────────────────────── */
 .alerta {
   padding: 12px 18px;

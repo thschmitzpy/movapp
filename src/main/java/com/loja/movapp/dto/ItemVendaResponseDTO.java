@@ -1,5 +1,7 @@
 package com.loja.movapp.dto;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+
 import java.math.BigDecimal;
 
 public class ItemVendaResponseDTO {
@@ -10,6 +12,7 @@ public class ItemVendaResponseDTO {
     private BigDecimal precoUnit;
     private BigDecimal subtotal;
 
+    @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
     public ItemVendaResponseDTO(String codigoProduto, String nomeProduto, int quantidade,
                                 BigDecimal precoUnit) {
 
