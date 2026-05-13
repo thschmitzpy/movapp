@@ -6,25 +6,18 @@ import com.loja.movapp.repository.IdempotencyKeyRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-/**
- * Operações transacionais isoladas para chaves de idempotência.
- *
- * Está em uma classe separada (não dentro do {@link IdempotencyService}) porque
- * @Transactional(REQUIRES_NEW) só é aplicado em chamadas que passam pelo proxy
- * Spring — chamadas internas (this.metodo()) são ignoradas. Mantendo essas
- * operações em outro bean, garante que cada uma rode em sua própria transação,
- * tornando a chave reivindicada visível para requisições concorrentes imediatamente.
- */
+
 @Component
 public class IdempotencyKeyStore {
 
@@ -33,20 +26,32 @@ public class IdempotencyKeyStore {
     @Autowired
     private IdempotencyKeyRepository repo;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<IdempotencyKey> tentarReivindicar(String chave, String endpoint, String requestHash) {
-        try {
-            IdempotencyKey ik = new IdempotencyKey();
-            ik.setChave(chave);
-            ik.setEndpoint(endpoint);
-            ik.setRequestHash(requestHash);
-            ik.setStatus(IdempotencyStatus.PROCESSANDO);
-            ik.setCriadoEm(LocalDateTime.now());
-            return Optional.of(repo.saveAndFlush(ik));
-        } catch (DataIntegrityViolationException race) {
+
+        LocalDateTime agora = LocalDateTime.now();
+        int rows = jdbc.update(
+                "INSERT INTO idempotency_keys (chave, endpoint, request_hash, status, criado_em) " +
+                "VALUES (?, ?, ?, ?, ?) ON CONFLICT (chave) DO NOTHING",
+                chave, endpoint, requestHash,
+                IdempotencyStatus.PROCESSANDO.name(),
+                Timestamp.valueOf(agora));
+
+        if (rows == 0) {
             log.info("Chave de idempotência '{}' já reivindicada por outra requisição", chave);
             return Optional.empty();
         }
+
+        IdempotencyKey ik = new IdempotencyKey();
+        ik.setChave(chave);
+        ik.setEndpoint(endpoint);
+        ik.setRequestHash(requestHash);
+        ik.setStatus(IdempotencyStatus.PROCESSANDO);
+        ik.setCriadoEm(agora);
+        return Optional.of(ik);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

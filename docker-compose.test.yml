@@ -1,0 +1,17 @@
+# Postgres dedicado para testes de integração.
+# Sobe na porta 5433 para não conflitar com o Postgres de desenvolvimento (5432).
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: movapp-postgres-test
+    environment:
+      POSTGRES_DB: movapp_test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d movapp_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
