@@ -1,19 +1,17 @@
 package com.loja.movapp.dto;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
 public class ProdutoRequestDTO {
 
-    @NotBlank(message = "Código não pode estar vazio")
     @Size(max = 20, message = "Código deve ter no máximo 20 caracteres")
     private String codigo;
 
-    @NotBlank(message = "Nome não pode estar vazio")
     @Size(max = 100, message = "Nome deve ter no máximo 100 caracteres")
     private String nome;
 
@@ -24,6 +22,7 @@ public class ProdutoRequestDTO {
     private String tamanho;
 
     @DecimalMin(value = "0.01", message = "Preço deve ser maior que zero")
+    @Digits(integer = 8, fraction = 2, message = "Preço deve ter até 8 dígitos inteiros e 2 decimais")
     private BigDecimal preco;
 
     @Min(value = 0, message = "Estoque não pode ser negativo")

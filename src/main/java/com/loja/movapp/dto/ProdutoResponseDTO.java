@@ -10,9 +10,10 @@ public class ProdutoResponseDTO {
     private String tamanho;
     private BigDecimal preco;
     private int estoque;
+    private boolean ativo;
 
     public ProdutoResponseDTO(String codigo, String nome, String cor, String tamanho,
-                              BigDecimal preco, int estoque) {
+                              BigDecimal preco, int estoque, boolean ativo) {
 
         this.codigo  = codigo;
         this.nome    = nome;
@@ -20,6 +21,7 @@ public class ProdutoResponseDTO {
         this.tamanho = tamanho;
         this.preco   = preco;
         this.estoque = estoque;
+        this.ativo   = ativo;
     }
 
     public String    getCodigo()  {return codigo; }
@@ -28,4 +30,5 @@ public class ProdutoResponseDTO {
     public String    getTamanho() {return tamanho; }
     public BigDecimal getPreco()  {return preco; }
     public int       getEstoque() {return estoque; }
+    public boolean   isAtivo()    {return ativo; }
 }

@@ -1,5 +1,6 @@
 package com.loja.movapp.service;
 
+import com.loja.movapp.dto.ProdutoCreateRequestDTO;
 import com.loja.movapp.dto.ProdutoRequestDTO;
 import com.loja.movapp.dto.ProdutoResponseDTO;
 import com.loja.movapp.exception.OperacaoNaoPermitidaException;
@@ -16,6 +17,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -34,6 +36,7 @@ class ProdutoServiceTest {
     private ProdutoService service;
 
     private Produto produto;
+    private ProdutoCreateRequestDTO createDTO;
     private ProdutoRequestDTO requestDTO;
 
     @BeforeEach
@@ -45,6 +48,14 @@ class ProdutoServiceTest {
         produto.setTamanho("M");
         produto.setPreco(new BigDecimal("29.90"));
         produto.setEstoque(50);
+
+        createDTO = new ProdutoCreateRequestDTO();
+        createDTO.setCodigo("001");
+        createDTO.setNome("Camiseta");
+        createDTO.setCor("Azul");
+        createDTO.setTamanho("M");
+        createDTO.setPreco(new BigDecimal("29.90"));
+        createDTO.setEstoque(50);
 
         requestDTO = new ProdutoRequestDTO();
         requestDTO.setCodigo("001");
@@ -60,11 +71,12 @@ class ProdutoServiceTest {
         when(repository.existsById("001")).thenReturn(false);
         when(repository.save(any(Produto.class))).thenReturn(produto);
 
-        ProdutoResponseDTO resultado = service.salvar(requestDTO);
+        ProdutoResponseDTO resultado = service.salvar(createDTO);
 
         assertNotNull(resultado);
         assertEquals("001", resultado.getCodigo());
         assertEquals("Camiseta", resultado.getNome());
+        assertTrue(resultado.isAtivo(), "produto novo nasce ativo");
         verify(repository, times(1)).save(any(Produto.class));
     }
 
@@ -73,7 +85,7 @@ class ProdutoServiceTest {
         when(repository.existsById("001")).thenReturn(true);
 
         OperacaoNaoPermitidaException ex = assertThrows(OperacaoNaoPermitidaException.class,
-                () -> service.salvar(requestDTO));
+                () -> service.salvar(createDTO));
 
         assertTrue(ex.getMessage().contains("já está cadastrado"));
         verify(repository, never()).save(any());
@@ -100,13 +112,17 @@ class ProdutoServiceTest {
     }
 
     @Test
-    void deveExcluirProdutoComEstoqueZero() {
+    void deveInativarProdutoComEstoqueZero() {
         produto.setEstoque(0);
         when(repository.findById("001")).thenReturn(Optional.of(produto));
-        doNothing().when(repository).deleteById("001");
+        when(repository.save(any(Produto.class))).thenReturn(produto);
 
         assertDoesNotThrow(() -> service.excluir("001"));
-        verify(repository, times(1)).deleteById("001");
+
+        // Soft delete: nunca chamar deleteById; salvar com ativo=false.
+        verify(repository, never()).deleteById(any());
+        verify(repository, times(1)).save(produto);
+        assertFalse(produto.isAtivo(), "produto deve ficar inativo após excluir");
     }
 
     @Test
@@ -119,6 +135,20 @@ class ProdutoServiceTest {
 
         assertTrue(ex.getMessage().contains("não pode ser excluído"));
         verify(repository, never()).deleteById(any());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void deveLancarOperacaoNaoPermitidaAoExcluirProdutoJaInativo() {
+        produto.setEstoque(0);
+        produto.setAtivo(false);
+        when(repository.findById("001")).thenReturn(Optional.of(produto));
+
+        OperacaoNaoPermitidaException ex = assertThrows(OperacaoNaoPermitidaException.class,
+                () -> service.excluir("001"));
+
+        assertTrue(ex.getMessage().contains("já está inativo"));
+        verify(repository, never()).save(any());
     }
 
 
@@ -158,16 +188,18 @@ class ProdutoServiceTest {
     }
 
     @Test
-    void deveBuscarPorFaixaDePrecoValida() {
+    void deveBuscarComFiltrosCombinados() {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Produto> page = new PageImpl<>(List.of(produto));
 
-        when(repository.buscarPorFaixaDePreco(new BigDecimal("10.0"), new BigDecimal("50.0"), pageable)).thenReturn(page);
+        when(repository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
 
-        Page<ProdutoResponseDTO> resultado = service.buscarPorFaixaDePreco(new BigDecimal("10.0"), new BigDecimal("50.0"), pageable);
+        Page<ProdutoResponseDTO> resultado = service.buscar(
+                "Cami", new BigDecimal("10.0"), new BigDecimal("50.0"), null, pageable);
 
         assertFalse(resultado.isEmpty());
         assertEquals(1, resultado.getTotalElements());
+        verify(repository, times(1)).findAll(any(Specification.class), eq(pageable));
     }
 
     @Test
@@ -175,18 +207,29 @@ class ProdutoServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.buscarPorFaixaDePreco(new BigDecimal("100.0"), new BigDecimal("10.0"), pageable));
+                () -> service.buscar(null, new BigDecimal("100.0"), new BigDecimal("10.0"), null, pageable));
 
         assertTrue(ex.getMessage().contains("mínimo não pode ser maior"));
+        verify(repository, never()).findAll(any(Specification.class), any(Pageable.class));
     }
 
     @Test
-    void deveLancarExcecaoQuandoPrecoNegativo() {
+    void deveLancarExcecaoQuandoPrecoMinNegativo() {
         Pageable pageable = PageRequest.of(0, 10);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.buscarPorFaixaDePreco(new BigDecimal("-10.0"), new BigDecimal("50.0"), pageable));
+                () -> service.buscar(null, new BigDecimal("-10.0"), new BigDecimal("50.0"), null, pageable));
 
-        assertTrue(ex.getMessage().contains("não podem ser negativos"));
+        assertTrue(ex.getMessage().contains("Preço mínimo não pode ser negativo"));
+    }
+
+    @Test
+    void deveLancarExcecaoQuandoPrecoMaxNegativo() {
+        Pageable pageable = PageRequest.of(0, 10);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.buscar(null, null, new BigDecimal("-1.0"), null, pageable));
+
+        assertTrue(ex.getMessage().contains("Preço máximo não pode ser negativo"));
     }
 }

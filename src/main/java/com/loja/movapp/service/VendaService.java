@@ -9,7 +9,8 @@ import com.loja.movapp.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -18,13 +19,17 @@ import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class VendaService {
@@ -37,13 +42,29 @@ public class VendaService {
     @Autowired
     private ProdutoRepository produtoRepository;
 
+    @Autowired
+    private CacheManager cacheManager;
+
+    private void agendarEvictDeProdutos(Set<String> codigos) {
+        if (codigos.isEmpty() || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        Set<String> snapshot = new LinkedHashSet<>(codigos);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                Cache cache = cacheManager.getCache("produtos");
+                if (cache != null) snapshot.forEach(cache::evict);
+            }
+        });
+    }
+
     @Retryable(
             retryFor = ObjectOptimisticLockingFailureException.class,
             maxAttempts = 4,
             backoff = @Backoff(delay = 50, multiplier = 2, random = true)
     )
     @Transactional
-    @CacheEvict(value = "produtos", allEntries = true)
     public VendaResponseDTO realizarVenda(VendaRequestDTO dto, String usuario) {
         log.info("Iniciando venda: {} item(ns), {} pagamento(s), usuario={}",
                 dto.getItens().size(), dto.getPagamentos().size(), usuario);
@@ -54,6 +75,7 @@ public class VendaService {
 
         List<ItemVenda> itens = new ArrayList<>();
         List<ItemVendaResponseDTO> itensResponse = new ArrayList<>();
+        Set<String> codigosComEstoqueAlterado = new LinkedHashSet<>();
         BigDecimal total = BigDecimal.ZERO;
 
         for (ItemVendaRequestDTO itemDTO : dto.getItens()) {
@@ -68,6 +90,12 @@ public class VendaService {
                                 "Produto \"" + itemDTO.getCodigoProduto() + "\" não encontrado!");
                     });
 
+            if (!produto.isAtivo()) {
+                log.warn("Venda bloqueada: produto '{}' está inativo", produto.getCodigo());
+                throw new OperacaoNaoPermitidaException(
+                        "Produto \"" + produto.getNome() + "\" está inativo e não pode ser vendido.");
+            }
+
             if (dto.getStatus() == StatusVenda.FECHADA) {
                 if (produto.getEstoque() < itemDTO.getQuantidade()) {
                     log.warn("Venda bloqueada: estoque insuficiente para '{}'. Disponível: {}, solicitado: {}",
@@ -79,6 +107,7 @@ public class VendaService {
                 }
                 produto.setEstoque(produto.getEstoque() - itemDTO.getQuantidade());
                 produtoRepository.save(produto);
+                codigosComEstoqueAlterado.add(produto.getCodigo());
                 log.info("Estoque atualizado: produto='{}', novo estoque={}", produto.getNome(), produto.getEstoque());
             }
 
@@ -87,6 +116,9 @@ public class VendaService {
             item.setProduto(produto);
             item.setQuantidade(itemDTO.getQuantidade());
             item.setPrecoUnit(produto.getPreco());
+            item.setProdutoNome(produto.getNome());
+            item.setProdutoCor(produto.getCor());
+            item.setProdutoTamanho(produto.getTamanho());
             itens.add(item);
 
             total = total.add(produto.getPreco().multiply(BigDecimal.valueOf(itemDTO.getQuantidade())));
@@ -103,6 +135,8 @@ public class VendaService {
         venda.setUsuario(usuario);
         Venda vendaSalva = vendaRepository.save(venda);
 
+        agendarEvictDeProdutos(codigosComEstoqueAlterado);
+
         log.info("Venda registrada: id={}, total=R${}, status={}, usuario={}",
                 vendaSalva.getId(), vendaSalva.getTotal(), vendaSalva.getStatus(), vendaSalva.getUsuario());
         return toDTOComItens(vendaSalva, itensResponse);
@@ -114,7 +148,6 @@ public class VendaService {
             backoff = @Backoff(delay = 50, multiplier = 2, random = true)
     )
     @Transactional
-    @CacheEvict(value = "produtos", allEntries = true)
     public VendaResponseDTO atualizarVenda(Long id, VendaRequestDTO dto, String usuario) {
         log.info("Atualizando venda: id={}, usuario={}", id, usuario);
 
@@ -136,6 +169,7 @@ public class VendaService {
         venda.getItens().clear();
 
         List<ItemVendaResponseDTO> itensResponse = new ArrayList<>();
+        Set<String> codigosComEstoqueAlterado = new LinkedHashSet<>();
         BigDecimal total = BigDecimal.ZERO;
 
         for (ItemVendaRequestDTO itemDTO : dto.getItens()) {
@@ -148,6 +182,12 @@ public class VendaService {
                                 "Produto \"" + itemDTO.getCodigoProduto() + "\" não encontrado!");
                     });
 
+            if (!produto.isAtivo()) {
+                log.warn("Atualização bloqueada: produto '{}' está inativo", produto.getCodigo());
+                throw new OperacaoNaoPermitidaException(
+                        "Produto \"" + produto.getNome() + "\" está inativo e não pode ser vendido.");
+            }
+
             if (dto.getStatus() == StatusVenda.FECHADA) {
                 if (produto.getEstoque() < itemDTO.getQuantidade()) {
                     log.warn("Atualização bloqueada: estoque insuficiente para '{}'. Disponível: {}, solicitado: {}",
@@ -159,6 +199,7 @@ public class VendaService {
                 }
                 produto.setEstoque(produto.getEstoque() - itemDTO.getQuantidade());
                 produtoRepository.save(produto);
+                codigosComEstoqueAlterado.add(produto.getCodigo());
             }
 
             ItemVenda novoItem = new ItemVenda();
@@ -166,6 +207,9 @@ public class VendaService {
             novoItem.setProduto(produto);
             novoItem.setQuantidade(itemDTO.getQuantidade());
             novoItem.setPrecoUnit(produto.getPreco());
+            novoItem.setProdutoNome(produto.getNome());
+            novoItem.setProdutoCor(produto.getCor());
+            novoItem.setProdutoTamanho(produto.getTamanho());
             venda.getItens().add(novoItem);
 
             total = total.add(produto.getPreco().multiply(BigDecimal.valueOf(itemDTO.getQuantidade())));
@@ -183,6 +227,9 @@ public class VendaService {
         venda.setUsuario(usuario);
 
         Venda vendaSalva = vendaRepository.save(venda);
+
+        agendarEvictDeProdutos(codigosComEstoqueAlterado);
+
         log.info("Venda atualizada: id={}, total=R${}, status={}, usuario={}",
                 vendaSalva.getId(), vendaSalva.getTotal(), vendaSalva.getStatus(), vendaSalva.getUsuario());
 
@@ -195,7 +242,6 @@ public class VendaService {
             backoff = @Backoff(delay = 50, multiplier = 2, random = true)
     )
     @Transactional
-    @CacheEvict(value = "produtos", allEntries = true)
     public void cancelarVenda(Long id) {
         log.info("Cancelando venda: id={}", id);
 
@@ -209,6 +255,8 @@ public class VendaService {
             throw new OperacaoNaoPermitidaException("Venda #" + id + " já está cancelada!");
         }
 
+        Set<String> codigosComEstoqueAlterado = new LinkedHashSet<>();
+
         if (venda.getStatus() == StatusVenda.FECHADA) {
             for (ItemVenda item : venda.getItens()) {
                 // Re-busca com lock para garantir leitura do estoque atual antes de restaurar.
@@ -217,17 +265,22 @@ public class VendaService {
                                 "Produto \"" + item.getProduto().getCodigo() + "\" não encontrado ao cancelar venda"));
                 p.setEstoque(p.getEstoque() + item.getQuantidade());
                 produtoRepository.save(p);
+                codigosComEstoqueAlterado.add(p.getCodigo());
                 log.info("Estoque restaurado: produto='{}', novo estoque={}", p.getNome(), p.getEstoque());
             }
         }
 
         venda.setStatus(StatusVenda.CANCELADA);
         vendaRepository.save(venda);
+
+        agendarEvictDeProdutos(codigosComEstoqueAlterado);
+
         log.info("Venda cancelada: id={}", id);
     }
 
+    // Vendas PENDENTES não deduziram estoque; deletá-las não afeta produtos
+    // — logo, nenhum evict de cache é necessário aqui.
     @Transactional
-    @CacheEvict(value = "produtos", allEntries = true)
     public void excluirVenda(Long id) {
         log.info("Excluindo venda: id={}", id);
 
@@ -289,9 +342,10 @@ public class VendaService {
     }
 
     private VendaResponseDTO toDTO(Venda v) {
+
         List<ItemVendaResponseDTO> itens = v.getItens().stream()
                 .map(i -> new ItemVendaResponseDTO(
-                        i.getProduto().getCodigo(), i.getProduto().getNome(),
+                        i.getProduto().getCodigo(), i.getProdutoNome(),
                         i.getQuantidade(), i.getPrecoUnit()
                 )).toList();
         return new VendaResponseDTO(

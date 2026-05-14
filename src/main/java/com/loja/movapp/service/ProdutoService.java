@@ -1,11 +1,13 @@
 package com.loja.movapp.service;
 
+import com.loja.movapp.dto.ProdutoCreateRequestDTO;
 import com.loja.movapp.dto.ProdutoRequestDTO;
 import com.loja.movapp.dto.ProdutoResponseDTO;
 import com.loja.movapp.exception.OperacaoNaoPermitidaException;
 import com.loja.movapp.exception.RecursoNaoEncontradoException;
 import com.loja.movapp.model.Produto;
 import com.loja.movapp.repository.ProdutoRepository;
+import com.loja.movapp.repository.ProdutoSpecifications;
 import java.math.BigDecimal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +17,7 @@ import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
@@ -29,7 +32,7 @@ public class ProdutoService {
     @Autowired
     private ProdutoRepository repository;
 
-    private Produto toEntity(ProdutoRequestDTO dto) {
+    private Produto toEntity(ProdutoCreateRequestDTO dto) {
         Produto p = new Produto();
         p.setCodigo(dto.getCodigo());
         p.setNome(dto.getNome());
@@ -43,19 +46,13 @@ public class ProdutoService {
     private ProdutoResponseDTO toDTO(Produto p) {
         return new ProdutoResponseDTO(
                 p.getCodigo(), p.getNome(), p.getCor(),
-                p.getTamanho(), p.getPreco(), p.getEstoque()
+                p.getTamanho(), p.getPreco(), p.getEstoque(), p.isAtivo()
         );
     }
 
     @Transactional
     @CachePut(value = "produtos", key = "#result.codigo")
-    public ProdutoResponseDTO salvar(ProdutoRequestDTO dto) {
-        if (dto.getEstoque() == null) {
-            throw new IllegalArgumentException("Estoque é obrigatório no cadastro de produto.");
-        }
-        if (dto.getPreco() == null) {
-            throw new IllegalArgumentException("Preço é obrigatório no cadastro de produto.");
-        }
+    public ProdutoResponseDTO salvar(ProdutoCreateRequestDTO dto) {
         if (repository.existsById(dto.getCodigo())) {
             log.warn("Cadastro bloqueado: código '{}' já existe", dto.getCodigo());
             throw new OperacaoNaoPermitidaException(
@@ -68,14 +65,35 @@ public class ProdutoService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ProdutoResponseDTO> listarPaginado(Pageable pageable) {
-        return repository.findAll(pageable).map(this::toDTO);
+    public Page<ProdutoResponseDTO> buscar(String nome,
+                                           BigDecimal precoMin,
+                                           BigDecimal precoMax,
+                                           Boolean ativo,
+                                           Pageable pageable) {
+        validarFaixaDePreco(precoMin, precoMax);
+
+        // Sem filtro de ativo no querystring, exibimos só catálogo vendável.
+        // ?ativo=false expõe inativos para telas administrativas.
+        Boolean filtroAtivo = ativo == null ? Boolean.TRUE : ativo;
+
+        Specification<Produto> spec = Specification
+                .where(ProdutoSpecifications.ativo(filtroAtivo))
+                .and(ProdutoSpecifications.nomeContem(nome))
+                .and(ProdutoSpecifications.precoEntre(precoMin, precoMax));
+
+        return repository.findAll(spec, pageable).map(this::toDTO);
     }
 
-    @Transactional(readOnly = true)
-    public Page<ProdutoResponseDTO> listarPorNome(String nome, Pageable pageable) {
-        log.info("Buscando produtos por nome: '{}'", nome);
-        return repository.findByNomeContainingIgnoreCase(nome, pageable).map(this::toDTO);
+    private void validarFaixaDePreco(BigDecimal min, BigDecimal max) {
+        if (min != null && min.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Preço mínimo não pode ser negativo!");
+        }
+        if (max != null && max.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Preço máximo não pode ser negativo!");
+        }
+        if (min != null && max != null && min.compareTo(max) > 0) {
+            throw new IllegalArgumentException("O preço mínimo não pode ser maior que o máximo!");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -97,6 +115,12 @@ public class ProdutoService {
                             "Produto com código \"" + codigo + "\" não encontrado!");
                 });
 
+        if (!p.isAtivo()) {
+            log.warn("Exclusão ignorada: produto codigo={} já está inativo", codigo);
+            throw new OperacaoNaoPermitidaException(
+                    "Produto \"" + p.getNome() + "\" já está inativo.");
+        }
+
         if (p.getEstoque() > 0) {
             log.warn("Exclusão bloqueada: produto='{}' possui {} unidade(s) em estoque", p.getNome(), p.getEstoque());
             throw new OperacaoNaoPermitidaException(
@@ -104,20 +128,9 @@ public class ProdutoService {
                             p.getEstoque() + " unidade(s) em estoque.");
         }
 
-        repository.deleteById(codigo);
-        log.info("Produto excluído: codigo={}", codigo);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<ProdutoResponseDTO> buscarPorFaixaDePreco(BigDecimal min, BigDecimal max, Pageable pageable) {
-        if (min.compareTo(BigDecimal.ZERO) < 0 || max.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Os valores de preço não podem ser negativos!");
-        }
-        if (min.compareTo(max) > 0) {
-            throw new IllegalArgumentException("O preço mínimo não pode ser maior que o máximo!");
-        }
-        log.info("Buscando produtos por faixa de preço: min={}, max={}", min, max);
-        return repository.buscarPorFaixaDePreco(min, max, pageable).map(this::toDTO);
+        p.setAtivo(false);
+        repository.save(p);
+        log.info("Produto inativado: codigo={}", codigo);
     }
 
     @Retryable(
@@ -135,11 +148,12 @@ public class ProdutoService {
                             "Produto com código \"" + codigo + "\" não encontrado!");
                 });
 
+        // Bean validation no DTO já rejeita preço <= 0 e estoque < 0 com 400.
         if (dto.getNome()    != null) p.setNome(dto.getNome());
         if (dto.getCor()     != null) p.setCor(dto.getCor());
         if (dto.getTamanho() != null) p.setTamanho(dto.getTamanho());
-        if (dto.getPreco()   != null && dto.getPreco().compareTo(BigDecimal.ZERO) > 0) p.setPreco(dto.getPreco());
-        if (dto.getEstoque() != null && dto.getEstoque() >= 0) p.setEstoque(dto.getEstoque());
+        if (dto.getPreco()   != null) p.setPreco(dto.getPreco());
+        if (dto.getEstoque() != null) p.setEstoque(dto.getEstoque());
 
         ProdutoResponseDTO atualizado = toDTO(repository.save(p));
         log.info("Produto atualizado: codigo={}", codigo);

@@ -26,17 +26,34 @@ public class ItemVenda {
     @Column(name = "preco_unit", precision = 10, scale = 2)
     private BigDecimal precoUnit;
 
-    public Long       getId()          { return id;         }
-    public Venda      getVenda()       { return venda;      }
-    public Produto    getProduto()     { return produto;    }
-    public int        getQuantidade()  { return quantidade; }
-    public BigDecimal getPrecoUnit()   { return precoUnit;  }
+    // Snapshot do produto no instante da venda. Imune a edições posteriores
+    // do cadastro — relatórios e recibos refletem o que o cliente comprou.
+    @Column(name = "produto_nome", nullable = false)
+    private String produtoNome;
 
-    public void setId(Long id)                  { this.id         = id;         }
-    public void setVenda(Venda venda)           { this.venda      = venda;      }
-    public void setProduto(Produto produto)     { this.produto    = produto;    }
-    public void setQuantidade(int qtd)          { this.quantidade = qtd;        }
-    public void setPrecoUnit(BigDecimal preco)  { this.precoUnit  = preco;      }
+    @Column(name = "produto_cor")
+    private String produtoCor;
+
+    @Column(name = "produto_tamanho")
+    private String produtoTamanho;
+
+    public Long       getId()             { return id;             }
+    public Venda      getVenda()          { return venda;          }
+    public Produto    getProduto()        { return produto;        }
+    public int        getQuantidade()     { return quantidade;     }
+    public BigDecimal getPrecoUnit()      { return precoUnit;      }
+    public String     getProdutoNome()    { return produtoNome;    }
+    public String     getProdutoCor()     { return produtoCor;     }
+    public String     getProdutoTamanho() { return produtoTamanho; }
+
+    public void setId(Long id)                  { this.id             = id;    }
+    public void setVenda(Venda venda)           { this.venda          = venda; }
+    public void setProduto(Produto produto)     { this.produto        = produto; }
+    public void setQuantidade(int qtd)          { this.quantidade     = qtd;   }
+    public void setPrecoUnit(BigDecimal preco)  { this.precoUnit      = preco; }
+    public void setProdutoNome(String nome)     { this.produtoNome    = nome;  }
+    public void setProdutoCor(String cor)       { this.produtoCor     = cor;   }
+    public void setProdutoTamanho(String t)     { this.produtoTamanho = t;     }
 }
 
 

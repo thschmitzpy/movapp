@@ -1,5 +1,6 @@
 package com.loja.movapp.controller;
 
+import com.loja.movapp.dto.ProdutoCreateRequestDTO;
 import com.loja.movapp.dto.ProdutoRequestDTO;
 import com.loja.movapp.dto.ProdutoResponseDTO;
 import com.loja.movapp.service.ProdutoService;
@@ -33,7 +34,7 @@ public class ProdutoController {
             @ApiResponse(responseCode = "400", description = "Dados inválidos"),
             @ApiResponse(responseCode = "409", description = "Código já cadastrado")
     })
-    public ResponseEntity<ProdutoResponseDTO> cadastrar(@Valid @RequestBody ProdutoRequestDTO dto) {
+    public ResponseEntity<ProdutoResponseDTO> cadastrar(@Valid @RequestBody ProdutoCreateRequestDTO dto) {
         ProdutoResponseDTO salvo = service.salvar(dto);
         return ResponseEntity
                 .created(URI.create("/produtos/" + salvo.getCodigo()))
@@ -41,18 +42,26 @@ public class ProdutoController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar produtos paginado", description = "Filtra por nome quando o parâmetro 'nome' é informado")
+    @Operation(
+            summary = "Buscar produtos com filtros combinados",
+            description = "Filtros opcionais: nome (contém), faixa de preço (precoMin/precoMax), ativo. " +
+                          "Sem ?ativo, retorna apenas o catálogo ativo."
+    )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Lista de produtos retornada com sucesso")
+            @ApiResponse(responseCode = "200", description = "Página de produtos retornada"),
+            @ApiResponse(responseCode = "400", description = "Faixa de preço inválida")
     })
-    public ResponseEntity<Page<ProdutoResponseDTO>> listar(
-            @Parameter(description = "Filtro parcial por nome (opcional)")
+    public ResponseEntity<Page<ProdutoResponseDTO>> buscar(
+            @Parameter(description = "Filtro parcial por nome (case-insensitive)")
             @RequestParam(required = false) String nome,
+            @Parameter(description = "Preço mínimo (inclusivo)")
+            @RequestParam(required = false) BigDecimal precoMin,
+            @Parameter(description = "Preço máximo (inclusivo)")
+            @RequestParam(required = false) BigDecimal precoMax,
+            @Parameter(description = "Filtrar por ativo. Sem parâmetro = só ativos.")
+            @RequestParam(required = false) Boolean ativo,
             Pageable pageable) {
-        if (nome != null && !nome.isBlank()) {
-            return ResponseEntity.ok(service.listarPorNome(nome, pageable));
-        }
-        return ResponseEntity.ok(service.listarPaginado(pageable));
+        return ResponseEntity.ok(service.buscar(nome, precoMin, precoMax, ativo, pageable));
     }
 
     @GetMapping("/{codigo}")
@@ -61,16 +70,20 @@ public class ProdutoController {
             @ApiResponse(responseCode = "200", description = "Produto encontrado"),
             @ApiResponse(responseCode = "404", description = "Não encontrado")
     })
-    public ResponseEntity<ProdutoResponseDTO> buscar(
+    public ResponseEntity<ProdutoResponseDTO> buscarPorCodigo(
             @Parameter(description = "Código do produto")
             @PathVariable String codigo) {
         return ResponseEntity.ok(service.buscarPorCodigo(codigo));
     }
 
-    @PutMapping("/{codigo}")
-    @Operation(summary = "Editar produto")
+    @PatchMapping("/{codigo}")
+    @Operation(
+            summary = "Editar produto (parcial)",
+            description = "Apenas os campos enviados são alterados. Campos omitidos permanecem como estão."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Produto atualizado"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos"),
             @ApiResponse(responseCode = "404", description = "Não encontrado")
     })
     public ResponseEntity<ProdutoResponseDTO> editar(
@@ -80,35 +93,16 @@ public class ProdutoController {
     }
 
     @DeleteMapping("/{codigo}")
-    @Operation(summary = "Excluir produto")
+    @Operation(summary = "Inativar produto (soft delete)")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Excluído com sucesso"),
+            @ApiResponse(responseCode = "204", description = "Produto inativado"),
             @ApiResponse(responseCode = "404", description = "Não encontrado"),
-            @ApiResponse(responseCode = "409", description = "Produto com estoque")
+            @ApiResponse(responseCode = "409", description = "Produto com estoque ou já inativo")
     })
     public ResponseEntity<Void> excluir(
             @Parameter(description = "Código do produto")
             @PathVariable String codigo) {
         service.excluir(codigo);
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/preco")
-    @Operation(summary = "Buscar por faixa de preço",
-            description = "Retorna produtos entre o preço mínimo e máximo com paginação")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Produtos encontrados na faixa"),
-            @ApiResponse(responseCode = "204", description = "Nenhum produto na faixa informada"),
-            @ApiResponse(responseCode = "400", description = "Faixa de preço inválida (negativa ou mín > máx)")
-    })
-    public ResponseEntity<Page<ProdutoResponseDTO>> buscarPorFaixaDePreco(
-            @Parameter(description = "Preço mínimo") @RequestParam BigDecimal min,
-            @Parameter(description = "Preço máximo") @RequestParam BigDecimal max,
-            Pageable pageable) {
-        Page<ProdutoResponseDTO> produtos = service.buscarPorFaixaDePreco(min, max, pageable);
-        if (produtos.isEmpty()) {
-            return ResponseEntity.noContent().build();
-        }
-        return ResponseEntity.ok(produtos);
     }
 }
