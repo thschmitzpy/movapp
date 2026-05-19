@@ -5,6 +5,7 @@ import com.loja.movapp.dto.LoginResponseDTO;
 import com.loja.movapp.exception.ErroResponse;
 import com.loja.movapp.security.JwtUtil;
 import com.loja.movapp.security.TokenBlacklist;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -44,6 +45,9 @@ public class AuthController {
     @Autowired
     private TokenBlacklist tokenBlacklist;
 
+    @Autowired
+    private MeterRegistry meterRegistry;
+
     @PostMapping("/login")
     @Operation(summary = "Login", description = "Retorna um token JWT válido por 24h")
     @ApiResponses({
@@ -59,9 +63,11 @@ public class AuthController {
             UserDetails userDetails = (UserDetails) auth.getPrincipal();
             String token = jwtUtil.generateToken(userDetails);
             String role  = userDetails.getAuthorities().iterator().next().getAuthority();
+            meterRegistry.counter("login.sucesso.total", "role", role).increment();
             log.info("Login realizado: username={}, role={}", userDetails.getUsername(), role);
             return ResponseEntity.ok(new LoginResponseDTO(token, userDetails.getUsername(), role));
         } catch (BadCredentialsException e) {
+            meterRegistry.counter("login.falhas.total", "motivo", "credenciais_invalidas").increment();
             log.warn("Tentativa de login falhou: username={}", dto.getUsername());
             return ResponseEntity.status(401)
                     .body(new ErroResponse(401, "Credenciais inválidas", "/auth/login"));

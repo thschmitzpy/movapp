@@ -107,6 +107,15 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**"
                         ).permitAll()
+                        // Actuator: health/info/prometheus liberados para health-checks e scrape
+                        // do Prometheus na rede interna. Demais endpoints exigem ADMIN.
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/actuator/info",
+                                "/actuator/prometheus"
+                        ).permitAll()
+                        .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST,   "/produtos/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT,    "/produtos/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/produtos/**").hasRole("ADMIN")

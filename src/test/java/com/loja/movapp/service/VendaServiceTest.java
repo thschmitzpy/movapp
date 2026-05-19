@@ -16,12 +16,15 @@ import com.loja.movapp.model.Venda;
 import java.math.BigDecimal;
 import com.loja.movapp.repository.ProdutoRepository;
 import com.loja.movapp.repository.VendaRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -40,6 +43,8 @@ class VendaServiceTest {
     @Mock
     private ProdutoRepository produtoRepository;
 
+    private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
     @InjectMocks
     private VendaService service;
 
@@ -49,6 +54,8 @@ class VendaServiceTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(service, "meterRegistry", meterRegistry);
+
         produto = new Produto();
         produto.setCodigo("001");
         produto.setNome("Camiseta");

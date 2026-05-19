@@ -6,6 +6,11 @@ import com.loja.movapp.exception.OperacaoNaoPermitidaException;
 import com.loja.movapp.exception.RecursoNaoEncontradoException;
 import com.loja.movapp.model.*;
 import com.loja.movapp.repository.*;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+// Lazy init no método: o registry só é injetado depois da construção,
+// e mocks em testes unitários não disparam @PostConstruct.
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +50,37 @@ public class VendaService {
     @Autowired
     private CacheManager cacheManager;
 
+    @Autowired
+    private MeterRegistry meterRegistry;
+
+    private volatile Timer vendaTimer;
+    private volatile DistributionSummary vendaValorSummary;
+
+    private Timer vendaTimer() {
+        Timer t = vendaTimer;
+        if (t == null) {
+            t = Timer.builder("venda.processamento")
+                    .description("Duração do processamento de uma venda (do request ao commit)")
+                    .publishPercentileHistogram(true)
+                    .register(meterRegistry);
+            vendaTimer = t;
+        }
+        return t;
+    }
+
+    private DistributionSummary vendaValorSummary() {
+        DistributionSummary s = vendaValorSummary;
+        if (s == null) {
+            s = DistributionSummary.builder("venda.valor")
+                    .description("Distribuição do valor total das vendas concluídas (R$)")
+                    .baseUnit("BRL")
+                    .publishPercentileHistogram(true)
+                    .register(meterRegistry);
+            vendaValorSummary = s;
+        }
+        return s;
+    }
+
     private void agendarEvictDeProdutos(Set<String> codigos) {
         if (codigos.isEmpty() || !TransactionSynchronizationManager.isSynchronizationActive()) {
             return;
@@ -66,6 +102,26 @@ public class VendaService {
     )
     @Transactional
     public VendaResponseDTO realizarVenda(VendaRequestDTO dto, String usuario) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+        try {
+            VendaResponseDTO resp = realizarVendaInterno(dto, usuario);
+            meterRegistry.counter("vendas.total", "status", resp.getStatus().name()).increment();
+            if (resp.getStatus() == StatusVenda.FECHADA && resp.getTotal() != null) {
+                vendaValorSummary().record(resp.getTotal().doubleValue());
+            }
+            return resp;
+        } catch (EstoqueInsuficienteException e) {
+            meterRegistry.counter("vendas.falhas.total", "motivo", "estoque_insuficiente").increment();
+            throw e;
+        } catch (ObjectOptimisticLockingFailureException e) {
+            meterRegistry.counter("estoque.conflito.otimista.total").increment();
+            throw e;
+        } finally {
+            sample.stop(vendaTimer());
+        }
+    }
+
+    private VendaResponseDTO realizarVendaInterno(VendaRequestDTO dto, String usuario) {
         log.info("Iniciando venda: {} item(ns), {} pagamento(s), usuario={}",
                 dto.getItens().size(), dto.getPagamentos().size(), usuario);
 
@@ -259,7 +315,7 @@ public class VendaService {
 
         if (venda.getStatus() == StatusVenda.FECHADA) {
             for (ItemVenda item : venda.getItens()) {
-                // Re-busca com lock para garantir leitura do estoque atual antes de restaurar.
+
                 Produto p = produtoRepository.buscarParaAtualizacaoEstoque(item.getProduto().getCodigo())
                         .orElseThrow(() -> new RecursoNaoEncontradoException(
                                 "Produto \"" + item.getProduto().getCodigo() + "\" não encontrado ao cancelar venda"));
@@ -275,11 +331,10 @@ public class VendaService {
 
         agendarEvictDeProdutos(codigosComEstoqueAlterado);
 
+        meterRegistry.counter("vendas.canceladas.total").increment();
         log.info("Venda cancelada: id={}", id);
     }
 
-    // Vendas PENDENTES não deduziram estoque; deletá-las não afeta produtos
-    // — logo, nenhum evict de cache é necessário aqui.
     @Transactional
     public void excluirVenda(Long id) {
         log.info("Excluindo venda: id={}", id);

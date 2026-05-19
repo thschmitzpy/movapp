@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loja.movapp.exception.OperacaoNaoPermitidaException;
 import com.loja.movapp.model.IdempotencyKey;
 import com.loja.movapp.model.IdempotencyStatus;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,28 +20,7 @@ import java.util.HexFormat;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-/**
- * Garante idempotência de operações sensíveis (ex.: finalização de venda).
- *
- * Fluxo:
- *  1) Cliente envia o header "Idempotency-Key" com um UUID único por intenção.
- *  2) Antes de executar a ação, reivindicamos a chave em transação própria
- *     (REQUIRES_NEW via {@link IdempotencyKeyStore}), de modo que outra requisição
- *     concorrente com a mesma chave enxergue o registro imediatamente.
- *  3) Se a chave já existir:
- *     - mesmo payload e CONCLUIDA → retornamos a resposta cacheada (replay).
- *     - mesmo payload e PROCESSANDO recente → 409, instrui retry posterior.
- *     - mesmo payload e PROCESSANDO há mais de {@link #PROCESSANDO_TIMEOUT} →
- *       assumimos que a execução original morreu (crash, queda de conexão) e
- *       liberamos a chave para reivindicação imediata.
- *     - payload diferente → 409, pois é reuso indevido da chave.
- *  4) Em caso de exceção da ação, tentamos liberar a chave para permitir retry.
- *     Falha em liberar é logada mas não mascara a exceção original — a chave
- *     será removida pelo job de limpeza periódica via {@link IdempotencyKeyStore}.
- *
- * Operações sem header passam direto pelo {@code Supplier}, mantendo o comportamento
- * legado intacto para clientes que ainda não foram atualizados.
- */
+
 @Service
 public class IdempotencyService {
 
@@ -53,6 +33,9 @@ public class IdempotencyService {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     public <T> T executar(String chave, String endpoint, Object requestPayload,
                           Supplier<T> acao, Class<T> tipoResposta) {
@@ -128,6 +111,7 @@ public class IdempotencyService {
                             "Aguarde alguns instantes e tente novamente.");
         }
 
+        meterRegistry.counter("idempotency.replay.total", "endpoint", endpoint).increment();
         log.info("Replay idempotente: chave='{}' — retornando resposta cacheada", chave);
         return fromJson(ik.getResponseBody(), tipoResposta);
     }
