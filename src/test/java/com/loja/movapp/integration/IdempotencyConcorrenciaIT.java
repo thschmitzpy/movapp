@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest
 @ActiveProfiles("test")
 @DisplayName("Idempotência de venda — replay e concorrência por Idempotency-Key")
-class IdempotencyConcorrenciaIT {
+class IdempotencyConcorrenciaIT extends AbstractPostgresIT {
 
     @Autowired private IdempotencyService idempotencyService;
     @Autowired private VendaService vendaService;
@@ -192,11 +192,6 @@ class IdempotencyConcorrenciaIT {
         return dto;
     }
 
-    /**
-     * Resultado de uma chamada concorrente. Exceção {@link OperacaoNaoPermitidaException}
-     * é esperada (caminho "ainda processando" do {@link IdempotencyService}); qualquer outra
-     * é falha real do teste.
-     */
     private record Resultado(VendaResponseDTO resposta, Throwable erro) {
         boolean foiSucesso()        { return resposta != null; }
         boolean foiErroInesperado() {

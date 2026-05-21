@@ -9,18 +9,16 @@ export default function Dashboard({ refreshAt, dataFiltro }) {
       const paramsVendas = { size: 500, sort: 'id,desc' };
       if (dataFiltro) paramsVendas.data = dataFiltro;
 
-      const [produtosRes, vendasFiltradasRes, vendasRecentesRes] = await Promise.all([
+      const [produtosRes, vendasFiltradasRes] = await Promise.all([
         api.get('/produtos', { params: { size: 1 } }),
         api.get('/vendas', { params: paramsVendas }),
-        api.get('/vendas', { params: { size: 200, sort: 'id,desc' } }),
       ]);
 
       const totalProdutos = produtosRes.data.totalElements || 0;
       const vendasFiltradas = vendasFiltradasRes.data.content || [];
-      const vendasRecentes = vendasRecentesRes.data.content || [];
 
       const vendasDia = vendasFiltradas.filter(v => v.status === 'FECHADA');
-      const vendasPendentes = vendasRecentes.filter(v => v.status === 'PENDENTE');
+      const vendasPendentes = vendasFiltradas.filter(v => v.status === 'PENDENTE');
       const totalDia = vendasDia.reduce((acc, v) => acc + Number(v.total), 0);
 
       const dataLabel = dataFiltro
@@ -35,7 +33,7 @@ export default function Dashboard({ refreshAt, dataFiltro }) {
         dataLabel,
       });
     } catch {
-      // falha silenciosa — dashboard é complementar
+
     }
   }, [dataFiltro]);
 
@@ -45,7 +43,6 @@ export default function Dashboard({ refreshAt, dataFiltro }) {
     return () => clearInterval(intervalo);
   }, [carregarMetricas]);
 
-  // Atualiza imediatamente ao realizar/cancelar venda ou mudar data
   useEffect(() => {
     if (refreshAt) carregarMetricas();
   }, [refreshAt, carregarMetricas]);
@@ -84,7 +81,7 @@ export default function Dashboard({ refreshAt, dataFiltro }) {
         <div className="dash-icone">⏳</div>
         <div className="dash-info">
           <span className="dash-valor">{metricas.vendasPendentes}</span>
-          <span className="dash-label">Vendas Pendentes</span>
+          <span className="dash-label">Vendas Pendentes — {metricas.dataLabel}</span>
         </div>
       </div>
     </div>

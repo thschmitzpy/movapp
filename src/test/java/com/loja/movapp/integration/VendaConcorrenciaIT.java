@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest
 @ActiveProfiles("test")
 @DisplayName("Concorrência de estoque — vendas paralelas")
-class VendaConcorrenciaIT {
+class VendaConcorrenciaIT extends AbstractPostgresIT {
 
     @Autowired
     private VendaService vendaService;
@@ -118,11 +118,6 @@ class VendaConcorrenciaIT {
                 "Apenas as vendas bem-sucedidas devem estar persistidas");
     }
 
-    /**
-     * Spring Retry encapsula a exceção da última tentativa em uma {@code RuntimeException}
-     * só quando esgota retries — para {@code EstoqueInsuficienteException} (não retentada)
-     * a exceção vem direta. Mas para robustez, descemos até a causa raiz quando aplicável.
-     */
     private Throwable desembrulharCauseEsperada(Throwable t) {
         Throwable atual = t;
         while (atual.getCause() != null && atual.getCause() != atual
