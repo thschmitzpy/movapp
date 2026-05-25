@@ -1,6 +1,7 @@
 package com.loja.movapp.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.BatchSize;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -35,9 +36,11 @@ public class Venda {
     private String usuario;
 
     @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 50)
     private List<ItemVenda> itens;
 
     @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 50)
     private List<PagamentoVenda> pagamentos = new ArrayList<>();
 
     public Long getId()                       { return id;                }

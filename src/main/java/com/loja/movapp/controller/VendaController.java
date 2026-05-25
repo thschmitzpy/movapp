@@ -1,5 +1,6 @@
 package com.loja.movapp.controller;
 
+import com.loja.movapp.dto.ResumoVendasResponseDTO;
 import com.loja.movapp.dto.VendaRequestDTO;
 import com.loja.movapp.dto.VendaResponseDTO;
 import com.loja.movapp.service.IdempotencyService;
@@ -87,6 +88,20 @@ public class VendaController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data,
             Pageable pageable) {
         return ResponseEntity.ok(service.buscarPorFiltros(id, data, pageable));
+    }
+
+    @GetMapping("/resumo")
+    @Operation(summary = "Resumo agregado para o dashboard",
+            description = "Retorna contadores (FECHADA, PENDENTE) e faturamento total das vendas FECHADAS, " +
+                    "opcionalmente filtrado por data. Tudo agregado no banco (COUNT/SUM) — não trafega linhas.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Resumo retornado com sucesso")
+    })
+    public ResponseEntity<ResumoVendasResponseDTO> resumo(
+            @Parameter(description = "Data da venda (yyyy-MM-dd). Omita para resumo geral.")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data) {
+        return ResponseEntity.ok(service.obterResumo(data));
     }
 
     @PutMapping("/{id}/cancelar")

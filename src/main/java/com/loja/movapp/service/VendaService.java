@@ -419,6 +419,7 @@ public class VendaService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public Page<VendaResponseDTO> buscarPorFiltros(Long id, LocalDate data, Pageable pageable) {
         if (id != null) {
             return vendaRepository.findById(id)
@@ -434,8 +435,30 @@ public class VendaService {
         return listarVendasPaginado(pageable);
     }
 
+    @Transactional(readOnly = true)
     public Page<VendaResponseDTO> listarVendasPaginado(Pageable pageable) {
         return vendaRepository.findAll(pageable).map(this::toDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public ResumoVendasResponseDTO obterResumo(LocalDate data) {
+        long fechadas;
+        long pendentes;
+        BigDecimal totalFechadas;
+
+        if (data != null) {
+            LocalDateTime inicio = data.atStartOfDay();
+            LocalDateTime fim    = data.plusDays(1).atStartOfDay();
+            fechadas      = vendaRepository.contarPorStatusNoIntervalo(StatusVenda.FECHADA,  inicio, fim);
+            pendentes     = vendaRepository.contarPorStatusNoIntervalo(StatusVenda.PENDENTE, inicio, fim);
+            totalFechadas = vendaRepository.somarTotalPorStatusNoIntervalo(StatusVenda.FECHADA, inicio, fim);
+        } else {
+            fechadas      = vendaRepository.contarPorStatus(StatusVenda.FECHADA);
+            pendentes     = vendaRepository.contarPorStatus(StatusVenda.PENDENTE);
+            totalFechadas = vendaRepository.somarTotalPorStatus(StatusVenda.FECHADA);
+        }
+
+        return new ResumoVendasResponseDTO(fechadas, pendentes, totalFechadas);
     }
 
 }

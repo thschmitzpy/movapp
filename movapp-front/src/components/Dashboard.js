@@ -6,20 +6,15 @@ export default function Dashboard({ refreshAt, dataFiltro }) {
 
   const carregarMetricas = useCallback(async () => {
     try {
-      const paramsVendas = { size: 500, sort: 'id,desc' };
-      if (dataFiltro) paramsVendas.data = dataFiltro;
+      const paramsResumo = dataFiltro ? { data: dataFiltro } : {};
 
-      const [produtosRes, vendasFiltradasRes] = await Promise.all([
+      const [produtosRes, resumoRes] = await Promise.all([
         api.get('/produtos', { params: { size: 1 } }),
-        api.get('/vendas', { params: paramsVendas }),
+        api.get('/vendas/resumo', { params: paramsResumo }),
       ]);
 
       const totalProdutos = produtosRes.data.totalElements || 0;
-      const vendasFiltradas = vendasFiltradasRes.data.content || [];
-
-      const vendasDia = vendasFiltradas.filter(v => v.status === 'FECHADA');
-      const vendasPendentes = vendasFiltradas.filter(v => v.status === 'PENDENTE');
-      const totalDia = vendasDia.reduce((acc, v) => acc + Number(v.total), 0);
+      const resumo = resumoRes.data || {};
 
       const dataLabel = dataFiltro
         ? new Date(dataFiltro + 'T00:00:00').toLocaleDateString('pt-BR')
@@ -27,9 +22,9 @@ export default function Dashboard({ refreshAt, dataFiltro }) {
 
       setMetricas({
         totalProdutos,
-        vendasDia: vendasDia.length,
-        totalDia,
-        vendasPendentes: vendasPendentes.length,
+        vendasDia: Number(resumo.vendasFechadas) || 0,
+        totalDia: Number(resumo.totalFechadas) || 0,
+        vendasPendentes: Number(resumo.vendasPendentes) || 0,
         dataLabel,
       });
     } catch {
