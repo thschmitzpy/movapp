@@ -107,8 +107,7 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**"
                         ).permitAll()
-                        // Actuator: health/info/prometheus liberados para health-checks e scrape
-                        // do Prometheus na rede interna. Demais endpoints exigem ADMIN.
+
                         .requestMatchers(
                                 "/actuator/health",
                                 "/actuator/health/**",
@@ -118,6 +117,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST,   "/produtos/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT,    "/produtos/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/produtos/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/produtos/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET,    "/produtos/**").hasAnyRole("ADMIN", "USER")
                         .anyRequest().authenticated()
@@ -132,7 +132,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of("http://localhost:3000"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT","PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
 

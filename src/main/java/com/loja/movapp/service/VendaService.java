@@ -9,8 +9,6 @@ import com.loja.movapp.repository.*;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-// Lazy init no método: o registry só é injetado depois da construção,
-// e mocks em testes unitários não disparam @PostConstruct.
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -135,9 +133,8 @@ public class VendaService {
         BigDecimal total = BigDecimal.ZERO;
 
         for (ItemVendaRequestDTO itemDTO : dto.getItens()) {
-            // Lock pessimista apenas quando o status é FECHADA para serializar deduções de estoque.
-            // Vendas PENDENTES não alteram estoque, então um findById simples é suficiente.
-            Produto produto = (dto.getStatus() == StatusVenda.FECHADA
+
+            Produto produto = (dto.getStatus() == StatusVenda.FECHADA                               // Lock pessimista apenas quando o status é FECHADA para serializar deduções de estoque.
                     ? produtoRepository.buscarParaAtualizacaoEstoque(itemDTO.getCodigoProduto())
                     : produtoRepository.findById(itemDTO.getCodigoProduto()))
                     .orElseThrow(() -> {
@@ -356,9 +353,6 @@ public class VendaService {
 
 
     private void aplicarPagamentos(Venda venda, List<PagamentoVendaRequestDTO> pagsReq, BigDecimal total) {
-        // Valores monetários: comparar sempre com escala 2 (HALF_UP) para evitar
-        // que jitter de ponto flutuante vindo do cliente (ex.: 189.89000000000001)
-        // dispare falso negativo contra o total calculado em BigDecimal no backend.
         BigDecimal totalNormalizado = total.setScale(2, RoundingMode.HALF_UP);
         BigDecimal soma = pagsReq.stream()
                 .map(PagamentoVendaRequestDTO::getValor)

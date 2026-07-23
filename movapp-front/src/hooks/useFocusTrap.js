@@ -9,9 +9,6 @@ const SELETOR_FOCAVEL = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
-// Mantém o foco do teclado dentro do container enquanto `ativo` for true.
-// Move o foco para o primeiro elemento focável ao ativar e restaura
-// o foco anterior quando desativa. `Esc` chama `onEscape` se fornecido.
 export function useFocusTrap(ativo, onEscape) {
   const containerRef = useRef(null);
   const onEscapeRef = useRef(onEscape);

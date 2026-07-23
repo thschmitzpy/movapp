@@ -4,12 +4,6 @@ import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
 
-/**
- * Registro de uma chave de idempotência (header Idempotency-Key).
- * Garante que requisições repetidas com a mesma chave (ex.: duplo clique
- * no botão Finalizar, retry de rede) não produzam efeitos duplicados:
- * a primeira execução é registrada e as repetições recebem a resposta cacheada.
- */
 @Entity
 @Table(name = "idempotency_keys")
 public class IdempotencyKey {

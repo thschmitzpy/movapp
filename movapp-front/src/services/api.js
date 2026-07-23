@@ -14,11 +14,6 @@ api.interceptors.request.use(config => {
   return config;
 });
 
-// Trata erros transversais:
-//   401/403 -> sessão expirada, redireciona para login
-//   5xx     -> falha do servidor, toast global
-//   sem response → rede/CORS/servidor fora do ar, toast global
-//   4xx     -> silencioso aqui (cada componente decide a UX contextual)
 api.interceptors.response.use(
   response => response,
   error => {
@@ -30,6 +25,18 @@ api.interceptors.response.use(
       window.location.reload();
       return Promise.reject(error);
     }
+    if (status === 401 || status === 403) {
+
+        const url = error.config?.url || '';                                                                            // Exceção: 401 do próprio /auth/login é senha errada
+        if (url.includes('/auth/login')) {
+          return Promise.reject(error);
+        }
+
+        localStorage.removeItem('token');
+        localStorage.removeItem('usuario');
+        window.location.reload();
+        return Promise.reject(error);
+      }
 
     if (axios.isCancel?.(error) || error.code === 'ERR_CANCELED') {
       return Promise.reject(error);

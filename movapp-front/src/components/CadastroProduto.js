@@ -88,7 +88,7 @@ export default function CadastroProduto({ isAdmin = false }) {
     };
     try {
       if (editando) {
-        await api.put(`/produtos/${editando}`, body);
+        await api.patch(`/produtos/${editando}`, body);
         exibirMensagem('Produto atualizado com sucesso!');
       } else {
         await api.post('/produtos', body);

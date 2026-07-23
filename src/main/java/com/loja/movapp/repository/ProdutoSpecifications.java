@@ -5,9 +5,6 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 
-// Predicados reutilizáveis para o endpoint unificado de busca de produtos.
-// Cada método retorna null quando o filtro não foi informado, deixando o
-// Specification.where(...).and(...) ignorar a cláusula naturalmente.
 public final class ProdutoSpecifications {
 
     private ProdutoSpecifications() {}
