@@ -1,15 +1,35 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: movapp-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - movapp-net
+
   movapp:
     image: movapp
     container_name: movapp
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/postgres
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=1234
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - movapp-net
 
@@ -34,9 +54,9 @@ services:
     container_name: movapp-grafana
     ports:
       - "3001:3000"
+    env_file:
+      - .env
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana-data:/var/lib/grafana
@@ -48,6 +68,7 @@ services:
       - movapp-net
 
 volumes:
+  postgres-data:
   prometheus-data:
   grafana-data:
 

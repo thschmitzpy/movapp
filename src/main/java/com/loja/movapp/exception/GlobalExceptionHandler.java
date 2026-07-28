@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -87,6 +89,27 @@ public class GlobalExceptionHandler {
         log.warn("Validação falhou [{}]: {}", request.getRequestURI(), message);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErroResponse(HttpStatus.BAD_REQUEST.value(), message, request.getRequestURI()));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+     public ResponseEntity<ErroResponse> handleAcesoNegado (
+             AccessDeniedException ex, HttpServletRequest request) {
+        log.warn("Acesso Negado [{}]: {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ErroResponse(HttpStatus.FORBIDDEN.value(),
+                        "Voce não tem permissão para acessar esse recurso.",
+                        request.getRequestURI()));
+
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErroResponse> handleNaoAutenticado (
+            AuthenticationException ex, HttpServletRequest request) {
+        log.warn("Falha de autenticação [{}]: {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ErroResponse(HttpStatus.UNAUTHORIZED.value(),
+                        "Autorização necessária ou inválida.",
+                        request.getRequestURI()));
     }
 
     @ExceptionHandler(Exception.class)
