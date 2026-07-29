@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, Fragment } from 'react';
 import api from '../../services/api';
-import { useToast } from '../../context/ToastContext';
+import { toast } from '../../services/toast';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { labelForma, labelCondicao, toInputDate } from './labels';
 
@@ -15,8 +15,6 @@ export default function ListaVendas({
   onIniciarEdicao,
   onVendaCancelada,
 }) {
-  const toast = useToast();
-
   const [vendas, setVendas] = useState([]);
   const [vendaExpandida, setVendaExpandida] = useState(null);
   const [filtroStatus, setFiltroStatus] = useState('TODAS');
@@ -45,7 +43,7 @@ export default function ListaVendas({
     } finally {
       setCarregando(false);
     }
-  }, [dataFiltro, toast]);
+  }, [dataFiltro]);
 
   useEffect(() => { carregarVendas(); }, [carregarVendas, refreshKey]);
 

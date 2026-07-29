@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
+import { toast } from '../services/toast';
 
 export default function Dashboard({ refreshAt, dataFiltro }) {
   const [metricas, setMetricas] = useState(null);
+  const [erro, setErro] = useState(false);
 
   const carregarMetricas = useCallback(async () => {
     try {
@@ -27,8 +29,14 @@ export default function Dashboard({ refreshAt, dataFiltro }) {
         vendasPendentes: Number(resumo.vendasPendentes) || 0,
         dataLabel,
       });
-    } catch {
+      setErro(false);
+    } catch (err) {
+      setErro(true);
 
+      const status = err?.response?.status;
+      if (status && status >= 400 && status < 500 && status !== 401 && status !== 403) {
+        toast.error('Não foi possível carregar as métricas do dashboard.');
+      }
     }
   }, [dataFiltro]);
 
@@ -42,7 +50,15 @@ export default function Dashboard({ refreshAt, dataFiltro }) {
     if (refreshAt) carregarMetricas();
   }, [refreshAt, carregarMetricas]);
 
-  if (!metricas) return null;
+  if (!metricas) {
+    return (
+      <div className="dashboard dashboard-vazio" role="status" aria-live="polite">
+        {erro
+          ? 'Não foi possível carregar as métricas. Tentando novamente...'
+          : 'Carregando métricas...'}
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard">

@@ -22,7 +22,7 @@ api.interceptors.response.use(
     if (status === 401 || status === 403) {
 
         const url = error.config?.url || '';                                                                            // Exceção: 401 do próprio /auth/login é senha errada
-        if (url.includes('/auth/login')) || url.includes('/auth/logout')) {
+        if (url.includes('/auth/login') || url.includes('/auth/logout')) {
           return Promise.reject(error);
         }
 
