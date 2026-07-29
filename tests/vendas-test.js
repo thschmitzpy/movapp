@@ -63,10 +63,10 @@ export default function () {
       { headers: HEADERS }
     );
     check(venda, {
-      'realizar venda - status 200': (r) => r.status === 200,
+      'realizar venda - status 201': (r) => r.status === 201,
     });
     tempoVenda.add(venda.timings.duration);
-    errosVenda.add(venda.status !== 200);
+    errosVenda.add(venda.status !== 201);
     sleep(1);
   }
 

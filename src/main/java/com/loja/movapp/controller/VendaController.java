@@ -20,6 +20,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.time.LocalDate;
 
 @RestController
@@ -40,7 +41,7 @@ public class VendaController {
                     "ou duplo-clique no cliente não criem vendas duplicadas — a primeira execução " +
                     "é registrada e chamadas subsequentes com a mesma chave retornam a resposta cacheada.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Venda registrada com sucesso (ou replay idempotente)"),
+            @ApiResponse(responseCode = "201", description = "Venda registrada com sucesso (ou replay idempotente)"),
             @ApiResponse(responseCode = "400", description = "Dados inválidos"),
             @ApiResponse(responseCode = "404", description = "Produto não encontrado"),
             @ApiResponse(responseCode = "409",
@@ -57,7 +58,9 @@ public class VendaController {
                 dto,
                 () -> service.realizarVenda(dto, userDetails.getUsername()),
                 VendaResponseDTO.class);
-        return ResponseEntity.ok(resposta);
+        return ResponseEntity
+                .created(URI.create("/vendas/" + resposta.getId()))
+                .body(resposta);
     }
 
     @PutMapping("/{id}")

@@ -38,8 +38,7 @@ export default function ListaVendas({
       setPagina(1);
     } catch (err) {
       const status = err?.response?.status;
-      // 401/403 já redireciona via interceptor; 5xx/rede já mostra toast global.
-      // 4xx é improvável aqui (listagem) — silencia.
+
       if (status && status !== 401 && status !== 403 && status < 500) {
         toast.error('Não foi possível carregar as vendas.');
       }

@@ -20,15 +20,9 @@ api.interceptors.response.use(
     const status = error.response?.status;
 
     if (status === 401 || status === 403) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('usuario');
-      window.location.reload();
-      return Promise.reject(error);
-    }
-    if (status === 401 || status === 403) {
 
         const url = error.config?.url || '';                                                                            // Exceção: 401 do próprio /auth/login é senha errada
-        if (url.includes('/auth/login')) {
+        if (url.includes('/auth/login')) || url.includes('/auth/logout')) {
           return Promise.reject(error);
         }
 
