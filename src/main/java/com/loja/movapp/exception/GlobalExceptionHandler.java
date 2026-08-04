@@ -6,12 +6,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 
 import java.util.stream.Collectors;
 
@@ -89,6 +92,36 @@ public class GlobalExceptionHandler {
         log.warn("Validação falhou [{}]: {}", request.getRequestURI(), message);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErroResponse(HttpStatus.BAD_REQUEST.value(), message, request.getRequestURI()));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErroResponse> handleJsonInvalido(
+            HttpMessageNotReadableException ex, HttpServletRequest request) {
+
+        String mensagem = "Corpo da requisição inválido ou mal formatado";
+        Throwable causa = ex.getMostSpecificCause();
+        if (causa instanceof InvalidFormatException ife && !ife.getPath().isEmpty()) {
+            String campo = ife.getPath().get(ife.getPath().size() - 1).getFieldName();
+            mensagem = "Valor inválido no campo '" + campo + "'. Esperado: "
+                    + ife.getTargetType().getSimpleName();
+        }
+
+        log.warn("JSON inválido [{}]: {}", request.getRequestURI(),
+                causa != null ? causa.getMessage() : ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErroResponse(HttpStatus.BAD_REQUEST.value(), mensagem, request.getRequestURI()));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErroResponse> handleTipoInvalido(
+            MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+
+        String tipoEsperado = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "?";
+        String mensagem = "Parâmetro '" + ex.getName() + "' inválido. Esperado: " + tipoEsperado;
+
+        log.warn("Tipo de parâmetro inválido [{}]: {}", request.getRequestURI(), mensagem);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErroResponse(HttpStatus.BAD_REQUEST.value(), mensagem, request.getRequestURI()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

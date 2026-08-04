@@ -354,10 +354,11 @@ public class VendaService {
 
     private void aplicarPagamentos(Venda venda, List<PagamentoVendaRequestDTO> pagsReq, BigDecimal total) {
         BigDecimal totalNormalizado = total.setScale(2, RoundingMode.HALF_UP);
-        BigDecimal soma = pagsReq.stream()
-                .map(PagamentoVendaRequestDTO::getValor)
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .setScale(2, RoundingMode.HALF_UP);
+        List<BigDecimal> valoresNormalizados = pagsReq.stream()
+                .map(p -> p.getValor().setScale(2, RoundingMode.HALF_UP))
+                .toList();
+        BigDecimal soma = valoresNormalizados.stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         if (soma.compareTo(totalNormalizado) != 0) {
             throw new OperacaoNaoPermitidaException(
@@ -365,12 +366,13 @@ public class VendaService {
                             ") difere do total da venda (R$ " + totalNormalizado + ")");
         }
 
-        for (PagamentoVendaRequestDTO p : pagsReq) {
+        for (int i = 0; i < pagsReq.size(); i++) {
+            PagamentoVendaRequestDTO p = pagsReq.get(i);
             PagamentoVenda pv = new PagamentoVenda();
             pv.setVenda(venda);
             pv.setFormaPagamento(p.getFormaPagamento());
             pv.setCondicaoPagamento(p.getCondicaoPagamento());
-            pv.setValor(p.getValor().setScale(2, RoundingMode.HALF_UP));
+            pv.setValor(valoresNormalizados.get(i));
             venda.getPagamentos().add(pv);
         }
 

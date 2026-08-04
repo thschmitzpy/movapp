@@ -3,6 +3,7 @@ package com.loja.movapp.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Digits;
 
 import java.math.BigDecimal;
 
@@ -15,6 +16,8 @@ public class PagamentoVendaRequestDTO {
 
     @NotNull(message = "Valor do pagamento é obrigatório")
     @Positive(message = "Valor do pagamento deve ser maior que zero")
+    @Digits(integer = 8, fraction = 2,
+    message = "Valor do pagamento deve ter até 8 digitos inteiros e no máximo 2 casas decimais")
     private BigDecimal valor;
 
     public String     getFormaPagamento()    { return formaPagamento;    }
