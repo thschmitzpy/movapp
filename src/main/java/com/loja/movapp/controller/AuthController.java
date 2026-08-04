@@ -25,10 +25,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
+import java.util.Map;
 
-/**
- * Endpoints de autenticação: login (retorna o token JWT) e logout (invalida o token atual).
- */
 @RestController
 @RequestMapping("/auth")
 @Tag(name = "Autenticação", description = "Endpoint de login para obtenção do token JWT")
@@ -82,11 +82,28 @@ public class AuthController {
     })
     public ResponseEntity<?> logout(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7);
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401)
+                    .body(new ErroResponse(401, "Token ausente ou inválido", "/auth/logout"));
+        }
+
+        String token = authHeader.substring(7).trim();
+        if (token.isEmpty()) {
+            return ResponseEntity.status(401)
+                    .body(new ErroResponse(401, "Token ausente ou inválido", "/auth/logout"));
+        }
+
+        try {
             tokenBlacklist.add(token, jwtUtil.extractExpiration(token));
             log.info("Logout realizado com sucesso");
+        } catch (ExpiredJwtException e) {
+
+            log.info("Logout com token já expirado — nada a blacklistar");
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("Logout com token inválido: {}", e.getClass().getSimpleName());
+            return ResponseEntity.status(401)
+                    .body(new ErroResponse(401, "Token inválido", "/auth/logout"));
         }
-        return ResponseEntity.ok().body("{\"mensagem\":\"Logout realizado com sucesso\"}");
+        return ResponseEntity.ok(Map.of("mensagem", "Logout realizado com sucesso"));
     }
 }
