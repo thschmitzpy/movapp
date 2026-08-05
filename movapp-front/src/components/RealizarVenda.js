@@ -16,6 +16,7 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
   const [mensagem, setMensagem] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const idempotencyKeyRef = useRef(null);
+  const ultimaAssinaturaRef = useRef(null);
   const [vendaEditando, setVendaEditando] = useState(null);
   const [refreshLista, setRefreshLista] = useState(0);
   const topoRef = useRef(null);
@@ -49,7 +50,7 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
           valor: venda.total != null ? String(venda.total) : '',
         }];
     setPagamentos(pagsBackend);
-    // BuscaProduto reseta via `key` quando vendaEditando muda.
+
     setTimeout(() => topoRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
   }, []);
 
@@ -59,7 +60,7 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
     setPagamentos([pagamentoVazio()]);
   }, []);
 
-  // Se a venda em edição for cancelada na lista, descarta o formulário.
+
   const handleVendaCancelada = useCallback((idCancelada) => {
     setVendaEditando(prev => {
       if (prev?.id === idCancelada) {
@@ -78,7 +79,7 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
       if (existe) {
         return prev.map(i =>
           i.codigoProduto === produto.codigo
-            ? { ...i, quantidade: i.quantidade + qtd }
+            ? { ...i, quantidade: i.quantidade + qtd, estoque = produto.estoque }
             : i
         );
       }
@@ -129,8 +130,6 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
       if (!p.condicaoPagamento) { exibirMensagem('Selecione a condição em todos os pagamentos.', 'erro'); return; }
     }
 
-    // Valor só precisa ser validado quando há mais de uma forma de pagamento
-    // (com forma única, o valor é implícito = total da venda).
     if (!ehUnico) {
       for (const p of pagsValidos) {
         if (!p.valor || Number(p.valor) <= 0) { exibirMensagem('Informe um valor maior que zero em cada pagamento.', 'erro'); return; }
@@ -158,6 +157,13 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
       })),
       status: statusVenda,
     };
+    if (!vendaEditando) {
+        const assinatura = JSON.stringify(body);
+        if (!idempotencyKeyRef.current || ultimaAssinaturaRef.current !== assinatura) {
+          idempotencyKeyRef.current = novaIdempotencyKey();
+        }
+        ultimaAssinaturaRef.current = assinatura;
+      }
 
     try {
       if (vendaEditando) {
@@ -176,15 +182,16 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
         exibirMensagem('Venda realizada com sucesso!');
       }
       idempotencyKeyRef.current = null;
+      ultimaAssinaturaRef.current = null
       cancelarEdicao();
       dispararRefresh();
       onVendaAtualizada?.();
     } catch (err) {
       const status = err.response?.status;
-      // 4xx → cliente precisa corrigir o payload, próxima tentativa é uma nova intenção.
-      // 5xx / sem resposta (rede) → mantém a chave para retry seguro.
+
       if (status && status >= 400 && status < 500) {
         idempotencyKeyRef.current = null;
+        ultimaAssinaturaRef.current = null;
       }
       const data = err.response?.data;
       const msg = typeof data === 'string' ? data : data?.mensagem || data?.message || data?.erro || 'Erro ao salvar venda.';
