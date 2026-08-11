@@ -123,6 +123,8 @@ public class VendaService {
         log.info("Iniciando venda: {} item(ns), {} pagamento(s), usuario={}",
                 dto.getItens().size(), dto.getPagamentos().size(), usuario);
 
+        validarStatusRequisicao(dto.getStatus());
+
         Venda venda = new Venda();
         venda.setData(LocalDateTime.now());
         venda.setStatus(dto.getStatus());
@@ -203,6 +205,8 @@ public class VendaService {
     @Transactional
     public VendaResponseDTO atualizarVenda(Long id, VendaRequestDTO dto, String usuario) {
         log.info("Atualizando venda: id={}, usuario={}", id, usuario);
+
+        validarStatusRequisicao(dto.getStatus());
 
         Venda venda = vendaRepository.findById(id)
                 .orElseThrow(() -> {
@@ -351,6 +355,14 @@ public class VendaService {
         log.info("Venda PENDENTE excluída: id={}", id);
     }
 
+
+    private void validarStatusRequisicao(StatusVenda status) {
+        if (status != StatusVenda.FECHADA && status != StatusVenda.PENDENTE) {
+            throw new OperacaoNaoPermitidaException(
+                    "Status inválido na requisição. Use FECHADA ou PENDENTE " +
+                            "(para cancelar uma venda, use DELETE /vendas/{id}).");
+        }
+    }
 
     private void aplicarPagamentos(Venda venda, List<PagamentoVendaRequestDTO> pagsReq, BigDecimal total) {
         BigDecimal totalNormalizado = total.setScale(2, RoundingMode.HALF_UP);

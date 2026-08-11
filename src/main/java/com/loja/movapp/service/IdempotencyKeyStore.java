@@ -78,7 +78,7 @@ public class IdempotencyKeyStore {
 
     static final Duration RETENCAO_PROCESSANDO_ORFAS = Duration.ofMinutes(15);
 
-    @Scheduled(fixedRate = 3_600_000)
+    @Scheduled(fixedRate = 300_000)
     public void limparChavesAntigas() {
         LocalDateTime limiteConcluidas = LocalDateTime.now().minus(RETENCAO_CONCLUIDAS);
         int concluidas = repo.deleteByStatusEAntesDe(IdempotencyStatus.CONCLUIDA, limiteConcluidas);

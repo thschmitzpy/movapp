@@ -14,8 +14,6 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -25,8 +23,6 @@ import java.util.function.Supplier;
 public class IdempotencyService {
 
     private static final Logger log = LoggerFactory.getLogger(IdempotencyService.class);
-
-    static final Duration PROCESSANDO_TIMEOUT = Duration.ofSeconds(60);
 
     @Autowired
     private IdempotencyKeyStore store;
@@ -97,15 +93,6 @@ public class IdempotencyService {
         }
 
         if (ik.getStatus() == IdempotencyStatus.PROCESSANDO) {
-            boolean orfa = ik.getCriadoEm()
-                    .isBefore(LocalDateTime.now().minus(PROCESSANDO_TIMEOUT));
-            if (orfa && permitirReivindicarOrfa) {
-                log.warn("Chave '{}' presa em PROCESSANDO há mais de {}s — " +
-                                "assumindo que a execução original morreu e reivindicando novamente",
-                        chave, PROCESSANDO_TIMEOUT.toSeconds());
-                store.liberar(chave);
-                return executarComChave(chave, endpoint, hashAtual, acao, tipoResposta, false);
-            }
             throw new OperacaoNaoPermitidaException(
                     "Requisição com Idempotency-Key '" + chave + "' ainda está em processamento. " +
                             "Aguarde alguns instantes e tente novamente.");

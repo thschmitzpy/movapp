@@ -8,6 +8,7 @@ import java.util.List;
 
 public class VendaRequestDTO {
 
+    @Valid
     @NotEmpty(message = "A venda precisa de pelo menos 1 item")
     private List<ItemVendaRequestDTO> itens;
 
