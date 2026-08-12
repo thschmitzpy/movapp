@@ -28,6 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import java.util.Map;
+import org.springframework.security.authentication.AccountExpiredException;
+import org.springframework.security.authentication.CredentialsExpiredException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
+import org.springframework.security.core.AuthenticationException;
 
 @RestController
 @RequestMapping("/auth")
@@ -66,9 +71,17 @@ public class AuthController {
             meterRegistry.counter("login.sucesso.total", "role", role).increment();
             log.info("Login realizado: username={}, role={}", userDetails.getUsername(), role);
             return ResponseEntity.ok(new LoginResponseDTO(token, userDetails.getUsername(), role));
-        } catch (BadCredentialsException e) {
-            meterRegistry.counter("login.falhas.total", "motivo", "credenciais_invalidas").increment();
-            log.warn("Tentativa de login falhou: username={}", dto.getUsername());
+        } catch (AuthenticationException e) {
+            String motivo;
+            if      (e instanceof BadCredentialsException)       motivo = "credenciais_invalidas";
+            else if (e instanceof DisabledException)             motivo = "conta_desabilitada";
+            else if (e instanceof LockedException)               motivo = "conta_bloqueada";
+            else if (e instanceof AccountExpiredException)       motivo = "conta_expirada";
+            else if (e instanceof CredentialsExpiredException)   motivo = "senha_expirada";
+            else                                                 motivo = "outro";
+
+            meterRegistry.counter("login.falhas.total", "motivo", motivo).increment();
+            log.warn("Tentativa de login falhou: username={}, motivo={}", dto.getUsername(), motivo);
             return ResponseEntity.status(401)
                     .body(new ErroResponse(401, "Credenciais inválidas", "/auth/login"));
         }

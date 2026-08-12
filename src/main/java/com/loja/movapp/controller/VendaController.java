@@ -65,18 +65,28 @@ public class VendaController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar venda pendente",
-            description = "Permite alterar itens, pagamento e status de uma venda PENDENTE")
+            description = "Permite alterar itens, pagamento e status de uma venda PENDENTE. " +
+                    "Aceita o header opcional 'Idempotency-Key' para tornar o retry seguro.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Venda atualizada com sucesso"),
+            @ApiResponse(responseCode = "200", description = "Venda atualizada com sucesso (ou replay idempotente)"),
             @ApiResponse(responseCode = "400", description = "Dados inválidos"),
             @ApiResponse(responseCode = "404", description = "Venda ou produto não encontrado"),
-            @ApiResponse(responseCode = "409", description = "Venda não está PENDENTE ou estoque insuficiente")
+            @ApiResponse(responseCode = "409",
+                    description = "Venda não está PENDENTE, estoque insuficiente, " +
+                            "ou Idempotency-Key reutilizada com payload diferente / em processamento")
     })
     public ResponseEntity<VendaResponseDTO> atualizar(
             @Parameter(description = "ID da venda") @PathVariable Long id,
             @Valid @RequestBody VendaRequestDTO dto,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.ok(service.atualizarVenda(id, dto, userDetails.getUsername()));
+        VendaResponseDTO resposta = idempotencyService.executar(
+                idempotencyKey,
+                "PUT /vendas/" + id,
+                dto,
+                () -> service.atualizarVenda(id, dto, userDetails.getUsername()),
+                VendaResponseDTO.class);
+        return ResponseEntity.ok(resposta);
     }
 
     @GetMapping

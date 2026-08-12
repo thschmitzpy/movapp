@@ -61,30 +61,37 @@ public class IdempotencyService {
     }
 
     private <T> T executarAcao(String chave, String endpoint, Supplier<T> acao) {
+        T resultado;
         try {
-            T resultado = acao.get();
-            store.concluir(chave, 200, toJson(resultado));
-            log.info("Idempotência registrada: chave='{}', endpoint='{}'", chave, endpoint);
-            return resultado;
+            resultado = acao.get();
         } catch (EstoqueInsuficienteException | OperacaoNaoPermitidaException
                  | RecursoNaoEncontradoException ex) {
-
             int status = statusHttpDe(ex);
             String body = toJson(new ErroResponse(status, ex.getMessage(), endpoint));
             try { store.concluir(chave, status, body); }
             catch (RuntimeException persistEx) {
-                log.error("Falha ao persistir erro de negócio na chave '{}'", chave, persistEx);
+                log.error("Falha ao cachear erro de negócio na chave '{}'. " +
+                        "Ficará PROCESSANDO até o cleanup.", chave, persistEx);
             }
             throw ex;
         } catch (RuntimeException ex) {
 
             try { store.liberar(chave); }
             catch (RuntimeException liberarEx) {
-                log.error("Falha ao liberar chave '{}' após erro na ação. " +
-                        "A chave será removida pelo job de limpeza.", chave, liberarEx);
+                log.error("Falha ao liberar chave '{}'. Será removida pelo cleanup.", chave, liberarEx);
             }
             throw ex;
         }
+
+        try {
+            store.concluir(chave, 200, toJson(resultado));
+            log.info("Idempotência registrada: chave='{}', endpoint='{}'", chave, endpoint);
+        } catch (RuntimeException persistEx) {
+            log.error("Falha ao cachear resposta da chave '{}' após venda comitada. " +
+                    "Retry receberá 409 até o cleanup (15 min).", chave, persistEx);
+
+        }
+        return resultado;
     }
 
     private int statusHttpDe(RuntimeException ex) {
