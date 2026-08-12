@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import jakarta.persistence.Version;
 
 @Entity
 @Table(name = "vendas")
@@ -24,6 +25,12 @@ public class Venda {
 
     @Column(name = "forma_pagamento")
     private String formaPagamento;
+
+    @Version
+    @Column(name = "versao")
+    private Long versao;
+
+    public Long getVersao() { return versao; }
 
     @Column(name = "condicao_pagamento")
     private String condicaoPagamento;

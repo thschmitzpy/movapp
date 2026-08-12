@@ -17,6 +17,11 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Optional;
 import java.util.function.Supplier;
+import com.loja.movapp.exception.EstoqueInsuficienteException;
+import com.loja.movapp.exception.OperacaoNaoPermitidaException;
+import com.loja.movapp.exception.RecursoNaoEncontradoException;
+import com.loja.movapp.exception.ErroResponse;
+import com.fasterxml.jackson.databind.JsonNode;
 
 
 @Service
@@ -61,16 +66,30 @@ public class IdempotencyService {
             store.concluir(chave, 200, toJson(resultado));
             log.info("Idempotência registrada: chave='{}', endpoint='{}'", chave, endpoint);
             return resultado;
+        } catch (EstoqueInsuficienteException | OperacaoNaoPermitidaException
+                 | RecursoNaoEncontradoException ex) {
+
+            int status = statusHttpDe(ex);
+            String body = toJson(new ErroResponse(status, ex.getMessage(), endpoint));
+            try { store.concluir(chave, status, body); }
+            catch (RuntimeException persistEx) {
+                log.error("Falha ao persistir erro de negócio na chave '{}'", chave, persistEx);
+            }
+            throw ex;
         } catch (RuntimeException ex) {
 
-            try {
-                store.liberar(chave);
-            } catch (RuntimeException liberarEx) {
+            try { store.liberar(chave); }
+            catch (RuntimeException liberarEx) {
                 log.error("Falha ao liberar chave '{}' após erro na ação. " +
                         "A chave será removida pelo job de limpeza.", chave, liberarEx);
             }
             throw ex;
         }
+    }
+
+    private int statusHttpDe(RuntimeException ex) {
+        if (ex instanceof RecursoNaoEncontradoException) return 404;
+        return 409;
     }
 
     private <T> T tratarChaveExistente(String chave, String endpoint, String hashAtual,
@@ -99,7 +118,15 @@ public class IdempotencyService {
         }
 
         meterRegistry.counter("idempotency.replay.total", "endpoint", endpoint).increment();
-        log.info("Replay idempotente: chave='{}' — retornando resposta cacheada", chave);
+        log.info("Replay idempotente: chave='{}' — retornando resposta cacheada (status={})",
+        chave, ik.getResponseStatus());
+        Integer status = ik.getResponseStatus();
+        if (status !=null && status >=400) {
+            String mensagem = extrairMensagem(ik.getResponseBody());
+            if (status == 404) throw new RecursoNaoEncontradoException(mensagem);
+            throw new OperacaoNaoPermitidaException(mensagem);
+        }
+
         return fromJson(ik.getResponseBody(), tipoResposta);
     }
 
@@ -116,6 +143,15 @@ public class IdempotencyService {
             return objectMapper.readValue(json, tipo);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Falha ao desserializar resposta cacheada de idempotência", e);
+        }
+    }
+    private String extrairMensagem(String responseBody) {
+        try {
+            JsonNode node = objectMapper.readTree(responseBody);
+            JsonNode msg = node.get("mensagem");
+            return msg != null && !msg.isNull() ? msg.asText() : "Erro na requisição anterior";
+        } catch (Exception e) {
+            return "Erro na requisição anterior";
         }
     }
 

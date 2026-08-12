@@ -7,12 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * DTO de resposta para Venda.
- * Contém id, data, total, status, itens e a lista de pagamentos.
- * Os campos formaPagamento/condicaoPagamento são mantidos para compatibilidade
- * (preenchidos com o único pagamento ou "MISTO" quando há múltiplas formas).
- */
+
 public class VendaResponseDTO {
 
     private Long id;

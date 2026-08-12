@@ -336,6 +336,12 @@ public class VendaService {
         log.info("Venda cancelada: id={}", id);
     }
 
+    @Retryable(
+            retryFor = ObjectOptimisticLockingFailureException.class,
+            maxAttempts = 4,
+            backoff = @Backoff(delay = 50, multiplier = 2, random = true)
+
+    )
     @Transactional
     public void excluirVenda(Long id) {
         log.info("Excluindo venda: id={}", id);
