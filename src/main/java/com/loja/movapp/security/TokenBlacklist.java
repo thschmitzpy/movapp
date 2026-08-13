@@ -1,5 +1,7 @@
 package com.loja.movapp.security;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.loja.movapp.model.BlacklistedToken;
 import com.loja.movapp.repository.BlacklistedTokenRepository;
 import org.slf4j.Logger;
@@ -8,13 +10,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 
-/**
- * Mantém uma lista de tokens JWT invalidados (logout) persistida no banco de dados.
- * Tokens ficam na tabela até expirar; uma limpeza automática roda a cada hora.
- */
+
 @Component
 public class TokenBlacklist {
 
@@ -23,13 +23,26 @@ public class TokenBlacklist {
     @Autowired
     private BlacklistedTokenRepository repository;
 
+    private final Cache<String, Boolean> naoBlacklistados = Caffeine.newBuilder()
+            .expireAfterWrite(Duration.ofMinutes(10))
+            .maximumSize(10_000)
+            .build();
+
     public void add(String token, Date expiration) {
         repository.save(new BlacklistedToken(token, expiration.toInstant()));
+        naoBlacklistados.invalidate(token);
         log.info("Token adicionado à blacklist (banco)");
     }
 
     public boolean isBlacklisted(String token) {
-        return repository.existsById(token);
+        if (naoBlacklistados.getIfPresent(token) != null) {
+            return false;
+        }
+        boolean blacklisted = repository.existsById(token);
+        if (!blacklisted) {
+            naoBlacklistados.put(token, Boolean.TRUE);
+        }
+        return blacklisted;
     }
 
     @Scheduled(fixedRate = 3_600_000)

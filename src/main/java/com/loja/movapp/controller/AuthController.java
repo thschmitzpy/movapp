@@ -18,6 +18,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,8 +67,12 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(dto.getUsername(), dto.getPassword())
             );
             UserDetails userDetails = (UserDetails) auth.getPrincipal();
+            String role = userDetails.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .findFirst()
+                    .orElseThrow(() -> new BadCredentialsException("Usuário sem permissões atribuídas"));
             String token = jwtUtil.generateToken(userDetails);
-            String role  = userDetails.getAuthorities().iterator().next().getAuthority();
+
             meterRegistry.counter("login.sucesso.total", "role", role).increment();
             log.info("Login realizado: username={}, role={}", userDetails.getUsername(), role);
             return ResponseEntity.ok(new LoginResponseDTO(token, userDetails.getUsername(), role));
