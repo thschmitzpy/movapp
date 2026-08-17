@@ -79,7 +79,7 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
       if (existe) {
         return prev.map(i =>
           i.codigoProduto === produto.codigo
-            ? { ...i, quantidade: i.quantidade + qtd, estoque = produto.estoque }
+            ? { ...i, quantidade: i.quantidade + qtd, estoque: produto.estoque }
             : i
         );
       }
