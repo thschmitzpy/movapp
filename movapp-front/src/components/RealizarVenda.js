@@ -29,30 +29,39 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
   }
 
   const iniciarEdicao = useCallback((venda) => {
-    setVendaEditando(venda);
-    setItens(venda.itens.map(i => ({
-      codigoProduto: i.codigoProduto,
-      nomeProduto: i.nomeProduto,
-      preco: i.precoUnit,
-      quantidade: i.quantidade,
-    })));
-    const pagsBackend = venda.pagamentos?.length
-      ? venda.pagamentos.map(p => ({
-          uid: novoUid(),
-          formaPagamento: p.formaPagamento || '',
-          condicaoPagamento: p.condicaoPagamento || '',
-          valor: p.valor != null ? String(p.valor) : '',
-        }))
-      : [{
-          uid: novoUid(),
-          formaPagamento: venda.formaPagamento || '',
-          condicaoPagamento: venda.condicaoPagamento || '',
-          valor: venda.total != null ? String(venda.total) : '',
-        }];
-    setPagamentos(pagsBackend);
 
-    setTimeout(() => topoRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-  }, []);
+      const temTrabalhoNaoSalvo = itens.length > 0 && vendaEditando?.id !== venda.id;
+      if (temTrabalhoNaoSalvo) {
+        const msg = vendaEditando
+          ? `Você está editando a Venda #${vendaEditando.id}. Descartar as alterações e abrir a Venda #${venda.id}?`
+          : `Você tem ${itens.length} item(ns) no carrinho da nova venda. Descartar e abrir a Venda #${venda.id} para edição?`;
+        if (!window.confirm(msg)) return;
+      }
+
+      setVendaEditando(venda);
+      setItens(venda.itens.map(i => ({
+        codigoProduto: i.codigoProduto,
+        nomeProduto: i.nomeProduto,
+        preco: i.precoUnit,
+        quantidade: i.quantidade,
+      })));
+      const pagsBackend = venda.pagamentos?.length
+        ? venda.pagamentos.map(p => ({
+            uid: novoUid(),
+            formaPagamento: p.formaPagamento || '',
+            condicaoPagamento: p.condicaoPagamento || '',
+            valor: p.valor != null ? String(p.valor) : '',
+          }))
+        : [{
+            uid: novoUid(),
+            formaPagamento: venda.formaPagamento || '',
+            condicaoPagamento: venda.condicaoPagamento || '',
+            valor: venda.total != null ? String(venda.total) : '',
+          }];
+      setPagamentos(pagsBackend);
+
+      setTimeout(() => topoRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    }, [itens.length, vendaEditando]);
 
   const cancelarEdicao = useCallback(() => {
     setVendaEditando(null);

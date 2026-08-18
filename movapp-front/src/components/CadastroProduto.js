@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../services/api';
 
 const camposVazios = { codigo: '', nome: '', cor: '', tamanho: '', preco: '', estoque: '' };
@@ -17,6 +17,8 @@ export default function CadastroProduto({ isAdmin = false }) {
   const [enviando, setEnviando] = useState(false);
   const [confirmarExclusao, setConfirmarExclusao] = useState(null);
 
+  const primeiroRenderRef = useRef(true);
+
   const carregarProdutos = useCallback(async (termo, pg = 1) => {
     setBuscando(true);
     try {
@@ -31,13 +33,14 @@ export default function CadastroProduto({ isAdmin = false }) {
     } finally {
       setBuscando(false);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Carrega ao montar
-  useEffect(() => { carregarProdutos('', 1); }, [carregarProdutos]);
-
-  // Debounce: aguarda 400ms após o usuário parar de digitar e reseta para página 1
   useEffect(() => {
+    if (primeiroRenderRef.current) {
+      primeiroRenderRef.current = false;
+      carregarProdutos('', 1);
+      return;
+    }
     setPagina(1);
     const timer = setTimeout(() => carregarProdutos(busca, 1), 400);
     return () => clearTimeout(timer);
