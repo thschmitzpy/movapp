@@ -9,7 +9,7 @@ echo   MovApp - Iniciando servicos...
 echo  ================================
 echo.
 
-REM Verifica se o backend ja esta rodando na porta 8080
+REM
 netstat -ano | findstr ":8080 " | findstr LISTENING >nul 2>&1
 if %errorlevel%==0 (
     echo [Backend] Ja esta rodando na porta 8080.
@@ -19,7 +19,7 @@ if %errorlevel%==0 (
     set BACKEND_INICIADO=1
 )
 
-REM Verifica se o frontend ja esta rodando na porta 3000
+REM
 netstat -ano | findstr ":3000 " | findstr LISTENING >nul 2>&1
 if %errorlevel%==0 (
     echo [Frontend] Ja esta rodando na porta 3000.
@@ -28,7 +28,7 @@ if %errorlevel%==0 (
     start "MovApp - Frontend" cmd /k "cd /d "%ROOT%movapp-front" && npm start"
 )
 
-REM Se o backend foi recem iniciado, aguarda ele ficar disponivel antes de abrir o browser
+REM
 if "%BACKEND_INICIADO%"=="1" (
     echo.
     echo  Aguardando o backend ficar disponivel na porta 8080...

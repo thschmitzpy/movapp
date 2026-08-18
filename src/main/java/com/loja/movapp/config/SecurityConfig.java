@@ -56,6 +56,9 @@ public class SecurityConfig {
     @Value("${app.user.password}")
     private String userPassword;
 
+    @Value("${app.cors.allowed-origins:http//localhost:3000,http://localhost})")
+    private String allowedOrigins;
+
     @Bean
     public InMemoryUserDetailsManager userDetailsManager() {
         UserDetails admin = User.builder()
@@ -131,8 +134,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:3000"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT","PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedOrigins(List.of(allowedOrigins.split("\\s*,\\s*")));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
 

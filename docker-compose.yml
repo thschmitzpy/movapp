@@ -18,6 +18,7 @@ services:
       - movapp-net
 
   movapp:
+    build: .
     image: movapp
     container_name: movapp
     ports:
@@ -25,11 +26,24 @@ services:
     env_file:
       - .env
     environment:
-
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB}
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - movapp-net
+
+  frontend:
+    build:
+      context: ./movapp-front
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8080}
+    image: movapp-front
+    container_name: movapp-front
+    ports:
+      - "3000:80"
+    depends_on:
+      - movapp
     networks:
       - movapp-net
 

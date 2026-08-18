@@ -1,10 +1,16 @@
 import axios from 'axios';
 import { toast } from './toast';
 
+let authHandler = null;
+
+export function _registerAuthHandler(fn) {
+  authHandler = fn;
+}
+
 const api = axios.create({
-  baseURL: 'http://localhost:8080',
-  headers: { 'Content-Type': 'application/json' },
-});
+    baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8080',
+    headers: { 'Content-Type': 'application/json' },
+  });
 
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token');

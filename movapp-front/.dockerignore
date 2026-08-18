@@ -1,0 +1,13 @@
+node_modules
+  build
+  .git
+  .gitignore
+  Dockerfile
+  .dockerignore
+  .env
+  .env.local
+  .env.development
+  .env.production
+  .env.example
+  npm-debug.log*
+  README.md
