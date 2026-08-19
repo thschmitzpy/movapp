@@ -56,7 +56,7 @@ public class SecurityConfig {
     @Value("${app.user.password}")
     private String userPassword;
 
-    @Value("${app.cors.allowed-origins:http//localhost:3000,http://localhost})")
+    @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost}")
     private String allowedOrigins;
 
     @Bean

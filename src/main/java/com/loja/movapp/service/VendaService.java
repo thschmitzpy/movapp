@@ -18,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -94,7 +96,7 @@ public class VendaService {
     }
 
     @Retryable(
-            retryFor = ObjectOptimisticLockingFailureException.class,
+            retryFor = { ObjectOptimisticLockingFailureException.class, CannotAcquireLockException.class },
             maxAttempts = 4,
             backoff = @Backoff(delay = 50, multiplier = 2, random = true)
     )
@@ -134,9 +136,12 @@ public class VendaService {
         Set<String> codigosComEstoqueAlterado = new LinkedHashSet<>();
         BigDecimal total = BigDecimal.ZERO;
 
-        for (ItemVendaRequestDTO itemDTO : dto.getItens()) {
+        List<ItemVendaRequestDTO> itensOrdenados = dto.getItens().stream()
+                .sorted(Comparator.comparing(ItemVendaRequestDTO::getCodigoProduto))
+                .toList();
+        for (ItemVendaRequestDTO itemDTO : itensOrdenados) {
 
-            Produto produto = (dto.getStatus() == StatusVenda.FECHADA                               // Lock pessimista apenas quando o status é FECHADA para serializar deduções de estoque.
+            Produto produto = (dto.getStatus() == StatusVenda.FECHADA
                     ? produtoRepository.buscarParaAtualizacaoEstoque(itemDTO.getCodigoProduto())
                     : produtoRepository.findById(itemDTO.getCodigoProduto()))
                     .orElseThrow(() -> {
@@ -198,7 +203,7 @@ public class VendaService {
     }
 
     @Retryable(
-            retryFor = ObjectOptimisticLockingFailureException.class,
+            retryFor = { ObjectOptimisticLockingFailureException.class, CannotAcquireLockException.class },
             maxAttempts = 4,
             backoff = @Backoff(delay = 50, multiplier = 2, random = true)
     )
@@ -229,7 +234,10 @@ public class VendaService {
         Set<String> codigosComEstoqueAlterado = new LinkedHashSet<>();
         BigDecimal total = BigDecimal.ZERO;
 
-        for (ItemVendaRequestDTO itemDTO : dto.getItens()) {
+        List<ItemVendaRequestDTO> itensOrdenados = dto.getItens().stream()
+                .sorted(Comparator.comparing(ItemVendaRequestDTO::getCodigoProduto))
+                .toList();
+        for (ItemVendaRequestDTO itemDTO : itensOrdenados) {
             Produto produto = (dto.getStatus() == StatusVenda.FECHADA
                     ? produtoRepository.buscarParaAtualizacaoEstoque(itemDTO.getCodigoProduto())
                     : produtoRepository.findById(itemDTO.getCodigoProduto()))
@@ -294,7 +302,7 @@ public class VendaService {
     }
 
     @Retryable(
-            retryFor = ObjectOptimisticLockingFailureException.class,
+            retryFor = { ObjectOptimisticLockingFailureException.class, CannotAcquireLockException.class },
             maxAttempts = 4,
             backoff = @Backoff(delay = 50, multiplier = 2, random = true)
     )
@@ -315,11 +323,14 @@ public class VendaService {
         Set<String> codigosComEstoqueAlterado = new LinkedHashSet<>();
 
         if (venda.getStatus() == StatusVenda.FECHADA) {
-            for (ItemVenda item : venda.getItens()) {
+            List<ItemVenda> itensOrdenados = venda.getItens().stream()
+                    .sorted(Comparator.comparing(ItemVenda::getCodigoProduto))
+                    .toList();
+            for (ItemVenda item : itensOrdenados) {
 
-                Produto p = produtoRepository.buscarParaAtualizacaoEstoque(item.getProduto().getCodigo())
+                Produto p = produtoRepository.buscarParaAtualizacaoEstoque(item.getCodigoProduto())
                         .orElseThrow(() -> new RecursoNaoEncontradoException(
-                                "Produto \"" + item.getProduto().getCodigo() + "\" não encontrado ao cancelar venda"));
+                                "Produto \"" + item.getCodigoProduto() + "\" não encontrado ao cancelar venda"));
                 p.setEstoque(p.getEstoque() + item.getQuantidade());
                 produtoRepository.save(p);
                 codigosComEstoqueAlterado.add(p.getCodigo());
@@ -414,7 +425,7 @@ public class VendaService {
 
         List<ItemVendaResponseDTO> itens = v.getItens().stream()
                 .map(i -> new ItemVendaResponseDTO(
-                        i.getProduto().getCodigo(), i.getProdutoNome(),
+                        i.getCodigoProduto(), i.getProdutoNome(),
                         i.getQuantidade(), i.getPrecoUnit()
                 )).toList();
         return new VendaResponseDTO(

@@ -20,14 +20,15 @@ public class ItemVenda {
     @JoinColumn(name = "codigo")
     private Produto produto;
 
+    @Column(name = "codigo", insertable = false, updatable = false)
+    private String codigoProduto;
+
     @Column(name = "quantidade")
     private int quantidade;
 
     @Column(name = "preco_unit", precision = 10, scale = 2)
     private BigDecimal precoUnit;
 
-    // Snapshot do produto no instante da venda. Imune a edições posteriores
-    // do cadastro — relatórios e recibos refletem o que o cliente comprou.
     @Column(name = "produto_nome", nullable = false)
     private String produtoNome;
 
@@ -40,6 +41,7 @@ public class ItemVenda {
     public Long       getId()             { return id;             }
     public Venda      getVenda()          { return venda;          }
     public Produto    getProduto()        { return produto;        }
+    public String     getCodigoProduto()  { return codigoProduto;  }
     public int        getQuantidade()     { return quantidade;     }
     public BigDecimal getPrecoUnit()      { return precoUnit;      }
     public String     getProdutoNome()    { return produtoNome;    }
