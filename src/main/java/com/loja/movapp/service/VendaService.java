@@ -437,16 +437,22 @@ public class VendaService {
     public Page<VendaResponseDTO> buscarPorFiltros(Long id, LocalDate data, Pageable pageable) {
         if (id != null) {
             return vendaRepository.findById(id)
+                    .filter(v -> data == null || ehDoDia(v.getData(), data))
                     .map(v -> (Page<VendaResponseDTO>) new PageImpl<>(List.of(toDTO(v)), pageable, 1))
                     .orElse(Page.empty(pageable));
         }
         if (data != null) {
-
             LocalDateTime inicio = data.atStartOfDay();
             LocalDateTime fim    = data.plusDays(1).atStartOfDay();
             return vendaRepository.buscarNoIntervalo(inicio, fim, pageable).map(this::toDTO);
         }
         return listarVendasPaginado(pageable);
+    }
+
+    private boolean ehDoDia(LocalDateTime dataVenda, LocalDate dia) {
+        LocalDateTime inicio = dia.atStartOfDay();
+        LocalDateTime fim    = dia.plusDays(1).atStartOfDay();
+        return !dataVenda.isBefore(inicio) && dataVenda.isBefore(fim);
     }
 
     @Transactional(readOnly = true)

@@ -58,7 +58,6 @@ class ProdutoServiceTest {
         createDTO.setEstoque(50);
 
         requestDTO = new ProdutoRequestDTO();
-        requestDTO.setCodigo("001");
         requestDTO.setNome("Camiseta");
         requestDTO.setCor("Azul");
         requestDTO.setTamanho("M");

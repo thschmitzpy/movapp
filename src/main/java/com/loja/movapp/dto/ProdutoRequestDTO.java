@@ -9,9 +9,6 @@ import java.math.BigDecimal;
 
 public class ProdutoRequestDTO {
 
-    @Size(max = 20, message = "Código deve ter no máximo 20 caracteres")
-    private String codigo;
-
     @Size(max = 100, message = "Nome deve ter no máximo 100 caracteres")
     private String nome;
 
@@ -28,14 +25,12 @@ public class ProdutoRequestDTO {
     @Min(value = 0, message = "Estoque não pode ser negativo")
     private Integer estoque;
 
-    public String getCodigo()  { return codigo;  }
     public String getNome()    { return nome;    }
     public String getCor()     { return cor;     }
     public String getTamanho() { return tamanho; }
     public BigDecimal getPreco() { return preco;   }
     public Integer getEstoque() { return estoque; }
 
-    public void setCodigo(String codigo)   { this.codigo  = codigo;  }
     public void setNome(String nome)       { this.nome    = nome;    }
     public void setCor(String cor)         { this.cor     = cor;     }
     public void setTamanho(String tamanho) { this.tamanho = tamanho; }
