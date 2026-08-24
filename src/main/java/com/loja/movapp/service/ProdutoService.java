@@ -148,7 +148,14 @@ public class ProdutoService {
                             "Produto com código \"" + codigo + "\" não encontrado!");
                 });
 
-        // Bean validation no DTO já rejeita preço <= 0 e estoque < 0 com 400.
+        if (!p.isAtivo()) {
+            log.warn("Edição bloqueada: produto codigo={} está inativo", codigo);
+            throw new OperacaoNaoPermitidaException(
+                    "Produto \"" + p.getNome() + "\" está inativo e não pode ser editado."
+            );
+        }
+
+
         if (dto.getNome()    != null) p.setNome(dto.getNome());
         if (dto.getCor()     != null) p.setCor(dto.getCor());
         if (dto.getTamanho() != null) p.setTamanho(dto.getTamanho());
