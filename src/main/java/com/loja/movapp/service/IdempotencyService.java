@@ -18,7 +18,6 @@ import java.util.HexFormat;
 import java.util.Optional;
 import java.util.function.Supplier;
 import com.loja.movapp.exception.EstoqueInsuficienteException;
-import com.loja.movapp.exception.OperacaoNaoPermitidaException;
 import com.loja.movapp.exception.RecursoNaoEncontradoException;
 import com.loja.movapp.exception.ErroResponse;
 import com.fasterxml.jackson.databind.JsonNode;

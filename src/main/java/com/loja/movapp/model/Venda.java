@@ -44,7 +44,7 @@ public class Venda {
 
     @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true)
     @BatchSize(size = 50)
-    private List<ItemVenda> itens;
+    private List<ItemVenda> itens = new ArrayList<>();
 
     @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true)
     @BatchSize(size = 50)

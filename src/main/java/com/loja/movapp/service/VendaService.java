@@ -32,6 +32,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -126,6 +127,7 @@ public class VendaService {
                 dto.getItens().size(), dto.getPagamentos().size(), usuario);
 
         validarStatusRequisicao(dto.getStatus());
+        validarSemItensDuplicados(dto.getItens());
 
         Venda venda = new Venda();
         venda.setData(LocalDateTime.now());
@@ -212,6 +214,7 @@ public class VendaService {
         log.info("Atualizando venda: id={}, usuario={}", id, usuario);
 
         validarStatusRequisicao(dto.getStatus());
+        validarSemItensDuplicados(dto.getItens());
 
         Venda venda = vendaRepository.findById(id)
                 .orElseThrow(() -> {
@@ -289,7 +292,6 @@ public class VendaService {
 
         venda.setTotal(total);
         venda.setStatus(dto.getStatus());
-        venda.setUsuario(usuario);
 
         Venda vendaSalva = vendaRepository.save(venda);
 
@@ -378,6 +380,18 @@ public class VendaService {
             throw new OperacaoNaoPermitidaException(
                     "Status inválido na requisição. Use FECHADA ou PENDENTE " +
                             "(para cancelar uma venda, use DELETE /vendas/{id}).");
+        }
+    }
+
+    private void validarSemItensDuplicados(List<ItemVendaRequestDTO> itens) {
+        Set<String> vistos = new HashSet<>();
+        for (ItemVendaRequestDTO item : itens) {
+            if (!vistos.add(item.getCodigoProduto())) {
+                throw new OperacaoNaoPermitidaException(
+                        "Produto \"" + item.getCodigoProduto() +
+                                "\" aparece mais de uma vez na venda. " +
+                                "Agrupe as quantidades em um único item.");
+            }
         }
     }
 
