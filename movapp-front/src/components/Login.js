@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import api from '../services/api';
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, mensagem, onLimparMensagem, onEsqueciSenha }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [erro, setErro] = useState('');
@@ -10,6 +10,7 @@ export default function Login({ onLogin }) {
   async function handleSubmit(e) {
     e.preventDefault();
     setErro('');
+    if (onLimparMensagem) onLimparMensagem();
     setCarregando(true);
     try {
       const res = await api.post('/auth/login', { username, password });
@@ -35,6 +36,7 @@ export default function Login({ onLogin }) {
           <p>Sistema de Gestão de Loja</p>
         </div>
         <form onSubmit={handleSubmit} className="login-form">
+          {mensagem && <div className="alerta sucesso">{mensagem}</div>}
           {erro && <div className="alerta erro">{erro}</div>}
           <div className="campo">
             <label>Usuário</label>
@@ -58,6 +60,13 @@ export default function Login({ onLogin }) {
           </div>
           <button type="submit" className="btn-primario btn-login" disabled={carregando}>
             {carregando ? 'Entrando...' : 'Entrar'}
+          </button>
+          <button
+            type="button"
+            className="link-esqueci"
+            onClick={onEsqueciSenha}
+          >
+            Esqueci minha senha
           </button>
         </form>
       </div>

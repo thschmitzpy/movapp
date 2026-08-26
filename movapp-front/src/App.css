@@ -10,7 +10,7 @@ body {
   font-family: var(--font-sans);
 }
 
-/* foco acessível padrão */
+
 *:focus { outline: none; }
 *:focus-visible {
   outline: none;
@@ -18,7 +18,7 @@ body {
   border-radius: var(--radius-sm);
 }
 
-/* ── Layout ────────────────────────────────── */
+
 .app {
   min-height: 100vh;
   display: flex;
@@ -121,7 +121,7 @@ body {
 
 .aba-ativa:hover { background: transparent; }
 
-/* ── Dashboard ─────────────────────────────── */
+
 .dashboard {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -316,7 +316,7 @@ input:disabled, select:disabled {
   margin-top: var(--space-1);
 }
 
-/* ── Botões ────────────────────────────────── */
+
 .btn-primario {
   background: linear-gradient(180deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
   color: white;
@@ -528,7 +528,7 @@ input:disabled, select:disabled {
   font-weight: 600;
 }
 
-/* ── Badges ────────────────────────────────── */
+
 .badge {
   display: inline-block;
   padding: 4px 12px;
@@ -555,7 +555,7 @@ input:disabled, select:disabled {
   transform: translateY(-1px);
 }
 
-/* ── Filtros de status ─────────────────────── */
+
 .filtros-status {
   display: flex;
   gap: var(--space-2);
@@ -603,7 +603,7 @@ input:disabled, select:disabled {
   color: inherit;
 }
 
-/* ── Expansão de itens ─────────────────────── */
+
 .linha-venda {
   cursor: pointer;
 }
@@ -687,7 +687,7 @@ input:disabled, select:disabled {
   border: none;
 }
 
-/* ── Cabeçalho lista ───────────────────────── */
+
 .cabecalho-lista {
   display: flex;
   align-items: center;
@@ -758,7 +758,7 @@ input:disabled, select:disabled {
   to   { transform: rotate(360deg); }
 }
 
-/* ── Venda ─────────────────────────────────── */
+
 .busca-produto {
   margin-bottom: var(--space-5);
 }
@@ -871,7 +871,7 @@ input:disabled, select:disabled {
   margin-top: var(--space-4);
 }
 
-/* ── Alertas ───────────────────────────────── */
+
 .alerta {
   padding: 12px 18px;
   border-radius: var(--radius-md);
@@ -935,7 +935,7 @@ input:disabled, select:disabled {
   color: var(--color-text-subtle);
 }
 
-/* ── Filtro de data ────────────────────────── */
+
 .lista-controles {
   display: flex;
   align-items: center;
@@ -998,7 +998,7 @@ input:disabled, select:disabled {
   letter-spacing: 0.02em;
 }
 
-/* ── Paginação ─────────────────────────────── */
+
 .paginacao {
   display: flex;
   align-items: center;
@@ -1024,7 +1024,7 @@ input:disabled, select:disabled {
   color: var(--color-text-subtle);
 }
 
-/* ── Modal ─────────────────────────────────── */
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1090,7 +1090,7 @@ input:disabled, select:disabled {
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ── Login ─────────────────────────────────── */
+
 .login-wrapper {
   min-height: 100vh;
   display: flex;
@@ -1146,4 +1146,30 @@ input:disabled, select:disabled {
   padding: 12px;
   font-size: 1rem;
   margin-top: var(--space-1);
+}
+
+.link-esqueci {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+  font-weight: 600;
+  padding: 6px;
+  margin-top: var(--space-1);
+  align-self: center;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--t-fast);
+}
+
+.link-esqueci:hover {
+  color: var(--color-primary-hover);
+}
+
+.link-esqueci:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-primary);
+  border-radius: var(--radius-sm);
 }

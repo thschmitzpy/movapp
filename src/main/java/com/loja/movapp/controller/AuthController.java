@@ -1,5 +1,11 @@
 package com.loja.movapp.controller;
 
+import com.loja.movapp.dto.ForgotPasswordRequestDTO;
+import com.loja.movapp.dto.ResetPasswordRequestDTO;
+import com.loja.movapp.security.PasswordResetTokenStore;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import com.loja.movapp.dto.LoginRequestDTO;
 import com.loja.movapp.dto.LoginResponseDTO;
 import com.loja.movapp.exception.ErroResponse;
@@ -53,6 +59,15 @@ public class AuthController {
 
     @Autowired
     private MeterRegistry meterRegistry;
+
+    @Autowired
+    private InMemoryUserDetailsManager userDetailsManager;
+
+    @Autowired
+    private PasswordResetTokenStore resetTokenStore;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @PostMapping("/login")
     @Operation(summary = "Login", description = "Retorna um token JWT válido por 24h")
@@ -124,4 +139,60 @@ public class AuthController {
         }
         return ResponseEntity.ok(Map.of("mensagem", "Logout realizado com sucesso"));
     }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Solicitar redefinição de senha",
+            description = "Gera um token temporário (TTL 15min). No demo, o token é retornado no corpo — "
+                        + "em produção seria enviado por e-mail.")
+    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequestDTO dto) {
+        String username = dto.getUsername();
+        boolean existe = userDetailsManager.userExists(username);
+
+        meterRegistry.counter("auth.forgot_password.total", "existe", String.valueOf(existe)).increment();
+
+        if (!existe) {
+            log.info("Solicitação de reset para usuário inexistente: {}", username);
+
+            return ResponseEntity.ok(Map.of(
+                    "mensagem", "Se o usuário existir, um token de redefinição foi gerado.",
+                    "aviso", "Modo demo: nenhum e-mail é enviado."
+            ));
+        }
+
+        String token = resetTokenStore.gerar(username);
+        log.info("Token de reset gerado para username={}", username);
+
+        return ResponseEntity.ok(Map.of(
+                "mensagem", "Token gerado com sucesso.",
+                "aviso", "Modo demo: em produção este token seria enviado por e-mail.",
+                "token", token,
+                "expiraEmMinutos", (int) PasswordResetTokenStore.TTL.toMinutes()
+        ));
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Redefinir senha com token", description = "Consome um token válido e atualiza a senha em memória.")
+    public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequestDTO dto) {
+        var usernameOpt = resetTokenStore.consumir(dto.getToken());
+        if (usernameOpt.isEmpty()) {
+            meterRegistry.counter("auth.reset_password.total", "resultado", "token_invalido").increment();
+            return ResponseEntity.status(400)
+                    .body(new ErroResponse(400, "Token inválido ou expirado", "/auth/reset-password"));
+        }
+
+        String username = usernameOpt.get();
+        try {
+            UserDetails atual = userDetailsManager.loadUserByUsername(username);
+            userDetailsManager.updatePassword(atual, passwordEncoder.encode(dto.getNovaSenha()));
+        } catch (UsernameNotFoundException e) {
+            meterRegistry.counter("auth.reset_password.total", "resultado", "usuario_removido").increment();
+            return ResponseEntity.status(400)
+                    .body(new ErroResponse(400, "Usuário não encontrado", "/auth/reset-password"));
+        }
+
+        meterRegistry.counter("auth.reset_password.total", "resultado", "sucesso").increment();
+        log.info("Senha redefinida com sucesso: username={}", username);
+        return ResponseEntity.ok(Map.of("mensagem", "Senha redefinida com sucesso."));
+    }
+
 }
