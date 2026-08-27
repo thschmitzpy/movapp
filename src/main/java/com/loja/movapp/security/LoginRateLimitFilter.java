@@ -49,7 +49,7 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        String ip = request.getRemoteAddr();
+        String ip = extrairIpCliente(request);
         Bucket bucket = buckets.get(ip, k -> criarBucket());
 
         if (bucket.tryConsume(1)) {
@@ -64,13 +64,8 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    private String extrairIpCliente (HttpServletRequest request) {
-        String xff =request.getHeader("x-Forwawed-For");
-        if (xff != null && !xff.isBlank()) {
-            int virgula = xff.indexOf(',');
-            String primeiro = (virgula > 0 ? xff.substring(0, virgula) : xff).trim();
-            if (!primeiro.isEmpty()) return primeiro;
-        }
-        return request.getRemoteAddr();
+    private String extrairIpCliente(HttpServletRequest request) {
+        String remote = request.getRemoteAddr();
+        return (remote != null && !remote.isBlank()) ? remote : "desconhecido";
     }
 }

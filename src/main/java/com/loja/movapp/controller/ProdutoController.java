@@ -105,4 +105,22 @@ public class ProdutoController {
         service.excluir(codigo);
         return ResponseEntity.noContent().build();
     }
+
+    @PatchMapping("/{codigo}/reativar")
+    @Operation(
+            summary = "Reativar produto inativado",
+            description = "Reverte o soft delete: volta um produto inativo para ativo=true. " +
+                    "Não altera preço, estoque ou outros campos."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Produto reativado"),
+            @ApiResponse(responseCode = "404", description = "Não encontrado"),
+            @ApiResponse(responseCode = "409", description = "Produto já está ativo")
+    })
+    public ResponseEntity<ProdutoResponseDTO> reativar(
+            @Parameter(description = "Código do produto")
+            @PathVariable String codigo) {
+        return ResponseEntity.ok(service.reativar(codigo));
+    }
+
 }

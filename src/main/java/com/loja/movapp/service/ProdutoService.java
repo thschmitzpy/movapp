@@ -72,8 +72,6 @@ public class ProdutoService {
                                            Pageable pageable) {
         validarFaixaDePreco(precoMin, precoMax);
 
-        // Sem filtro de ativo no querystring, exibimos só catálogo vendável.
-        // ?ativo=false expõe inativos para telas administrativas.
         Boolean filtroAtivo = ativo == null ? Boolean.TRUE : ativo;
 
         Specification<Produto> spec = Specification
@@ -166,4 +164,32 @@ public class ProdutoService {
         log.info("Produto atualizado: codigo={}", codigo);
         return atualizado;
     }
+
+    @Retryable(
+            retryFor = ObjectOptimisticLockingFailureException.class,
+            maxAttempts = 4,
+            backoff = @Backoff(delay = 50, multiplier = 2, random = true)
+    )
+    @Transactional
+    @CachePut(value = "produtos", key = "#codigo")
+    public ProdutoResponseDTO reativar(String codigo) {
+        Produto p = repository.findById(codigo)
+                .orElseThrow(() -> {
+                    log.warn("Tentativa de reativar produto inexistente: codigo={}", codigo);
+                    return new RecursoNaoEncontradoException(
+                            "Produto com código \"" + codigo + "\" não encontrado!");
+                });
+
+        if (p.isAtivo()) {
+            log.warn("Reativação ignorada: produto codigo={} já está ativo", codigo);
+            throw new OperacaoNaoPermitidaException(
+                    "Produto \"" + p.getNome() + "\" já está ativo.");
+        }
+
+        p.setAtivo(true);
+        ProdutoResponseDTO reativado = toDTO(repository.save(p));
+        log.info("Produto reativado: codigo={}", codigo);
+        return reativado;
+    }
+
 }
