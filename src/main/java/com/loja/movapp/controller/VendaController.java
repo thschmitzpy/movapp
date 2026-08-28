@@ -126,8 +126,9 @@ public class VendaController {
             @ApiResponse(responseCode = "409", description = "Venda já está cancelada")
     })
     public ResponseEntity<Void> cancelar(
-            @Parameter(description = "ID da venda") @PathVariable Long id) {
-        service.cancelarVenda(id);
+            @Parameter(description = "ID da venda") @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        service.cancelarVenda(id, userDetails.getUsername());
         return ResponseEntity.noContent().build();
     }
 
@@ -140,8 +141,9 @@ public class VendaController {
             @ApiResponse(responseCode = "409", description = "Venda não está PENDENTE")
     })
     public ResponseEntity<Void> excluir(
-            @Parameter(description = "ID da venda") @PathVariable Long id) {
-        service.excluirVenda(id);
+            @Parameter(description = "ID da venda") @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        service.excluirVenda(id, userDetails.getUsername());
         return ResponseEntity.noContent().build();
     }
 

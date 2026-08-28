@@ -309,12 +309,12 @@ public class VendaService {
             backoff = @Backoff(delay = 50, multiplier = 2, random = true)
     )
     @Transactional
-    public void cancelarVenda(Long id) {
-        log.info("Cancelando venda: id={}", id);
+    public void cancelarVenda(Long id, String usuario) {
+        log.info("Cancelando venda: id={}, usuario={}", id, usuario);
 
         Venda venda = vendaRepository.findById(id)
                 .orElseThrow(() -> {
-                    log.warn("Tentativa de cancelar venda inexistente: id={}", id);
+                    log.warn("Tentativa de cancelar venda inexistente: id={}, usuario={}", id, usuario);
                     return new RecursoNaoEncontradoException("Venda #" + id + " não encontrada!");
                 });
 
@@ -346,7 +346,8 @@ public class VendaService {
         agendarEvictDeProdutos(codigosComEstoqueAlterado);
 
         meterRegistry.counter("vendas.canceladas.total").increment();
-        log.info("Venda cancelada: id={}", id);
+        log.info("Venda cancelada: id={}, criador={}, canceladaPor={}",
+                id, venda.getUsuario(), usuario);
     }
 
     @Retryable(
@@ -356,22 +357,24 @@ public class VendaService {
 
     )
     @Transactional
-    public void excluirVenda(Long id) {
-        log.info("Excluindo venda: id={}", id);
+    public void excluirVenda(Long id, String usuario) {
+        log.info("Excluindo venda: id={}, usuario={}", id, usuario);
 
         Venda venda = vendaRepository.findById(id)
                 .orElseThrow(() -> {
-                    log.warn("Tentativa de excluir venda inexistente: id={}", id);
+                    log.warn("Tentativa de excluir venda inexistente: id={}, usuario={}", id, usuario);
                     return new RecursoNaoEncontradoException("Venda #" + id + " não encontrada!");
                 });
 
         if (venda.getStatus() != StatusVenda.PENDENTE) {
-            log.warn("Exclusão bloqueada: venda id={} está com status={}", id, venda.getStatus());
+            log.warn("Exclusão bloqueada: venda id={} está com status={}, usuario={}",
+                    id, venda.getStatus(), usuario);
             throw new OperacaoNaoPermitidaException("Apenas vendas PENDENTES podem ser excluídas!");
         }
 
         vendaRepository.delete(venda);
-        log.info("Venda PENDENTE excluída: id={}", id);
+        log.info("Venda PENDENTE excluída: id={}, criador={}, excluidaPor={}",
+                id, venda.getUsuario(), usuario);
     }
 
 
