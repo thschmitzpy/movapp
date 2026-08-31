@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.LocalDate;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/vendas")
@@ -33,6 +34,18 @@ public class VendaController {
 
     @Autowired
     private IdempotencyService idempotencyService;
+
+    private static final Pattern IDEMPOTENCY_KEY_PATTERN = Pattern.compile(
+            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+
+    private String validarIdempotencyKey(String key) {
+        if (key == null || key.isBlank()) return null;
+        if (!IDEMPOTENCY_KEY_PATTERN.matcher(key).matches()) {
+            throw new IllegalArgumentException(
+                    "Header 'Idempotency-Key' inválido: deve ser um UUID (ex: 550e8400-e29b-41d4-a716-446655440000).");
+        }
+        return key;
+    }
 
     @PostMapping
     @Operation(summary = "Realizar venda",
@@ -52,8 +65,9 @@ public class VendaController {
             @Valid @RequestBody VendaRequestDTO dto,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @AuthenticationPrincipal UserDetails userDetails) {
+        String chave = validarIdempotencyKey(idempotencyKey);
         VendaResponseDTO resposta = idempotencyService.executar(
-                idempotencyKey,
+                chave,
                 "POST /vendas",
                 dto,
                 () -> service.realizarVenda(dto, userDetails.getUsername()),
@@ -80,8 +94,9 @@ public class VendaController {
             @Valid @RequestBody VendaRequestDTO dto,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @AuthenticationPrincipal UserDetails userDetails) {
+        String chave = validarIdempotencyKey(idempotencyKey);
         VendaResponseDTO resposta = idempotencyService.executar(
-                idempotencyKey,
+                chave,
                 "PUT /vendas/" + id,
                 dto,
                 () -> service.atualizarVenda(id, dto, userDetails.getUsername()),

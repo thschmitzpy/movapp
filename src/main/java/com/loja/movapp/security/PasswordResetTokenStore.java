@@ -30,8 +30,7 @@ public class PasswordResetTokenStore {
     }
 
     public Optional<String> consumir(String token) {
-        String username = tokens.getIfPresent(token);
-        if (username != null) tokens.invalidate(token);
+        String username = tokens.asMap().remove(token);
         return Optional.ofNullable(username);
     }
 }
