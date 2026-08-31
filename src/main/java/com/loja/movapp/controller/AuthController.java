@@ -186,6 +186,7 @@ public class AuthController {
             userDetailsManager.updatePassword(atual, passwordEncoder.encode(dto.getNovaSenha()));
         } catch (UsernameNotFoundException e) {
             meterRegistry.counter("auth.reset_password.total", "resultado", "usuario_removido").increment();
+            log.warn("Reset com token válido mas usuário inexistente: username={}", username);
             return ResponseEntity.status(400)
                     .body(new ErroResponse(400, "Usuário não encontrado", "/auth/reset-password"));
         }

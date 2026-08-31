@@ -65,11 +65,45 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErroResponse> handleIntegridadeDados(
             DataIntegrityViolationException ex, HttpServletRequest request) {
 
-        log.warn("Violação de integridade [{}]: {}", request.getRequestURI(), ex.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErroResponse(HttpStatus.CONFLICT.value(),
-                        "Operação não permitida: o registro possui dados associados e não pode ser removido.",
-                        request.getRequestURI()));
+        String sqlState = extrairSqlState(ex);
+        HttpStatus status;
+        String mensagem;
+
+        switch (sqlState) {
+            case "23505" -> {
+                status = HttpStatus.CONFLICT;
+                mensagem = "Registro já existe: um valor único informado já está cadastrado.";
+            }
+            case "23503" -> {
+                status = HttpStatus.CONFLICT;
+                mensagem = "Operação não permitida: o registro possui dados associados e não pode ser removido.";
+            }
+            case "23502" -> {
+                status = HttpStatus.BAD_REQUEST;
+                mensagem = "Campo obrigatório ausente na requisição.";
+            }
+            case "22001" -> {
+                status = HttpStatus.BAD_REQUEST;
+                mensagem = "Valor informado excede o tamanho máximo permitido.";
+            }
+            default -> {
+                status = HttpStatus.CONFLICT;
+                mensagem = "Violação de integridade dos dados.";
+            }
+        }
+
+        log.warn("Violação de integridade [{}] sqlState={}: {}",
+                request.getRequestURI(), sqlState, ex.getMostSpecificCause().getMessage());
+        return ResponseEntity.status(status)
+                .body(new ErroResponse(status.value(), mensagem, request.getRequestURI()));
+    }
+
+    private String extrairSqlState(DataIntegrityViolationException ex) {
+        Throwable causa = ex.getMostSpecificCause();
+        if (causa instanceof java.sql.SQLException sqlEx) {
+            return sqlEx.getSQLState() != null ? sqlEx.getSQLState() : "";
+        }
+        return "";
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

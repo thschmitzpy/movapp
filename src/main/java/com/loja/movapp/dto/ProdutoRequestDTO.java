@@ -4,18 +4,22 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 
 import java.math.BigDecimal;
 
 public class ProdutoRequestDTO {
 
     @Size(max = 100, message = "Nome deve ter no máximo 100 caracteres")
+    @Pattern(regexp = "^(?!\\s*$).+", message = "Nome não pode estar em branco")
     private String nome;
 
     @Size(max = 50, message = "Cor deve ter no máximo 50 caracteres")
+    @Pattern(regexp = "^(?!\\s*$).+", message = "Cor não pode estar em branco")
     private String cor;
 
     @Size(max = 10, message = "Tamanho deve ter no máximo 10 caracteres")
+    @Pattern(regexp = "^(?!\\s*$).+", message = "Tamanho não pode estar em branco")
     private String tamanho;
 
     @DecimalMin(value = "0.01", message = "Preço deve ser maior que zero")
