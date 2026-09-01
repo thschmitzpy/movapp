@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-  import Login from './components/Login';
+  import Autenticacao from './components/Autenticacao';
   import Dashboard from './components/Dashboard';
   import CadastroProduto from './components/CadastroProduto';
   import RealizarVenda from './components/RealizarVenda';
@@ -56,7 +56,7 @@ import { useState, useEffect, useRef } from 'react';
     }
 
     if (!logado) {
-      return <Login onLogin={handleLogin} />;
+      return <Autenticacao onLogin={handleLogin} />;
     }
 
     const isAdmin = usuario?.role === 'ROLE_ADMIN';
