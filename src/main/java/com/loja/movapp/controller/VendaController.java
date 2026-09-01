@@ -3,6 +3,7 @@ package com.loja.movapp.controller;
 import com.loja.movapp.dto.ResumoVendasResponseDTO;
 import com.loja.movapp.dto.VendaRequestDTO;
 import com.loja.movapp.dto.VendaResponseDTO;
+import com.loja.movapp.model.StatusVenda;
 import com.loja.movapp.service.IdempotencyService;
 import com.loja.movapp.service.VendaService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -114,8 +115,10 @@ public class VendaController {
             @Parameter(description = "ID exato da venda") @RequestParam(required = false) Long id,
             @Parameter(description = "Data da venda (yyyy-MM-dd)") @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data,
+            @Parameter(description = "Status: FECHADA | PENDENTE | CANCELADA")
+            @RequestParam(required = false) StatusVenda status,
             Pageable pageable) {
-        return ResponseEntity.ok(service.buscarPorFiltros(id, data, pageable));
+        return ResponseEntity.ok(service.buscarPorFiltros(id, data, status, pageable));
     }
 
     @GetMapping("/resumo")

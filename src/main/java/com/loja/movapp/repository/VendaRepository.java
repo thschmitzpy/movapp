@@ -15,10 +15,16 @@ import java.time.LocalDateTime;
 @Repository
 public interface VendaRepository extends JpaRepository<Venda, Long> {
 
-    @Query("SELECT v FROM Venda v WHERE v.data >= :inicio AND v.data < :fim")
-    Page<Venda> buscarNoIntervalo(@Param("inicio") LocalDateTime inicio,
-                                  @Param("fim") LocalDateTime fim,
-                                  Pageable pageable);
+    @Query("""
+            SELECT v FROM Venda v
+            WHERE (:inicio IS NULL OR v.data >= :inicio)
+              AND (:fim    IS NULL OR v.data <  :fim)
+              AND (:status IS NULL OR v.status = :status)
+            """)
+    Page<Venda> filtrar(@Param("inicio") LocalDateTime inicio,
+                        @Param("fim") LocalDateTime fim,
+                        @Param("status") StatusVenda status,
+                        Pageable pageable);
 
     @Query("SELECT COUNT(v) FROM Venda v WHERE v.status = :status")
     long contarPorStatus(@Param("status") StatusVenda status);

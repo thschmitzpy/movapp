@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, Fragment } from 'react';
 import api from '../../services/api';
 import { toast } from '../../services/toast';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
-import { labelForma, labelCondicao, toInputDate } from './labels';
+import { labelForma, labelCondicao } from './labels';
 
 const PAGE_SIZE = 20;
 const STATUS_FILTROS = ['TODAS', 'FECHADA', 'PENDENTE', 'CANCELADA'];
@@ -20,20 +20,24 @@ export default function ListaVendas({
   const [filtroStatus, setFiltroStatus] = useState('TODAS');
   const [carregando, setCarregando] = useState(false);
   const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [totalElementos, setTotalElementos] = useState(0);
   const [confirmarCancelamento, setConfirmarCancelamento] = useState(null);
 
   const fecharModalCancelar = useCallback(() => setConfirmarCancelamento(null), []);
   const modalCancelarRef = useFocusTrap(!!confirmarCancelamento, fecharModalCancelar);
 
-  const carregarVendas = useCallback(async () => {
+  const carregarVendas = useCallback(async (pg = 1) => {
     setCarregando(true);
     try {
-      const params = dataFiltro
-        ? `data=${dataFiltro}&size=500&sort=id,desc`
-        : 'size=200&sort=id,desc';
-      const res = await api.get(`/vendas?${params}`);
-      setVendas(res.data.content);
-      setPagina(1);
+      const params = { page: pg - 1, size: PAGE_SIZE, sort: 'id,desc' };
+      if (dataFiltro) params.data = dataFiltro;
+      if (filtroStatus !== 'TODAS') params.status = filtroStatus;
+      const res = await api.get('/vendas', { params });
+      setVendas(res.data.content || []);
+      setTotalPaginas(res.data.totalPages || 1);
+      setTotalElementos(res.data.totalElements || 0);
+      setPagina(pg);
     } catch (err) {
       const status = err?.response?.status;
 
@@ -43,9 +47,9 @@ export default function ListaVendas({
     } finally {
       setCarregando(false);
     }
-  }, [dataFiltro]);
+  }, [dataFiltro, filtroStatus]);
 
-  useEffect(() => { carregarVendas(); }, [carregarVendas, refreshKey]);
+  useEffect(() => { carregarVendas(1); }, [carregarVendas, refreshKey]);
 
   async function executarCancelamento() {
     const venda = confirmarCancelamento;
@@ -54,25 +58,13 @@ export default function ListaVendas({
       await api.put(`/vendas/${venda.id}/cancelar`);
       toast.success(`Venda #${venda.id} cancelada. Estoque restaurado se aplicável.`);
       onVendaCancelada?.(venda.id);
-      carregarVendas();
+      carregarVendas(pagina);
     } catch (err) {
       const data = err.response?.data;
       const msg = typeof data === 'string' ? data : data?.mensagem || data?.message || 'Erro ao cancelar venda.';
       toast.error(msg);
     }
   }
-
-  const vendasPorData = dataFiltro
-    ? vendas.filter(v => toInputDate(v.data) === dataFiltro)
-    : vendas;
-
-  const vendasFiltradas = filtroStatus === 'TODAS'
-    ? vendasPorData
-    : vendasPorData.filter(v => v.status === filtroStatus);
-
-  const totalPaginas = Math.max(1, Math.ceil(vendasFiltradas.length / PAGE_SIZE));
-  const paginaAtual = Math.min(pagina, totalPaginas);
-  const vendasPagina = vendasFiltradas.slice((paginaAtual - 1) * PAGE_SIZE, paginaAtual * PAGE_SIZE);
 
   return (
     <div className="card">
@@ -108,19 +100,19 @@ export default function ListaVendas({
               type="date"
               className="input-data-filtro"
               value={dataFiltro}
-              onChange={e => { onDataFiltroChange(e.target.value); setPagina(1); setVendaExpandida(null); }}
+              onChange={e => { onDataFiltroChange(e.target.value); setVendaExpandida(null); }}
             />
             {dataFiltro && (
               <button
                 className="btn-hoje"
-                onClick={() => { onDataFiltroChange(''); setPagina(1); setVendaExpandida(null); }}
+                onClick={() => { onDataFiltroChange(''); setVendaExpandida(null); }}
                 title="Limpar filtro de data"
               >
                 ✕ Limpar
               </button>
             )}
           </div>
-          <button className="btn-secundario" onClick={carregarVendas} disabled={carregando}>
+          <button className="btn-secundario" onClick={() => carregarVendas(pagina)} disabled={carregando}>
             {carregando ? 'Atualizando...' : 'Atualizar'}
           </button>
         </div>
@@ -128,14 +120,14 @@ export default function ListaVendas({
 
       <div className="filtros-status">
         {STATUS_FILTROS.map(f => {
-          const count = f === 'TODAS' ? vendasPorData.length : vendasPorData.filter(v => v.status === f).length;
+          const count = filtroStatus === f ? totalElementos : null;
           return (
             <button
               key={f}
               className={`filtro-btn ${filtroStatus === f ? 'filtro-ativo' : ''} filtro-${f.toLowerCase()}`}
-              onClick={() => { setFiltroStatus(f); setVendaExpandida(null); setPagina(1); }}
+              onClick={() => { setFiltroStatus(f); setVendaExpandida(null); }}
             >
-              {f} <span className="filtro-count">{count}</span>
+              {f} {count != null && <span className="filtro-count">{count}</span>}
             </button>
           );
         })}
@@ -143,7 +135,7 @@ export default function ListaVendas({
 
       {carregando ? (
         <p className="vazio">Carregando vendas...</p>
-      ) : vendasFiltradas.length === 0 ? (
+      ) : vendas.length === 0 ? (
         <p className="vazio">Nenhuma venda com status {filtroStatus}.</p>
       ) : (
         <>
@@ -164,7 +156,7 @@ export default function ListaVendas({
                 </tr>
               </thead>
               <tbody>
-                {vendasPagina.map(v => {
+                {vendas.map(v => {
                   const expandida = vendaExpandida === v.id;
                   return (
                     <Fragment key={v.id}>
@@ -286,19 +278,19 @@ export default function ListaVendas({
             <div className="paginacao">
               <button
                 className="btn-secundario btn-pag"
-                onClick={() => setPagina(p => Math.max(1, p - 1))}
-                disabled={paginaAtual === 1}
+                onClick={() => carregarVendas(pagina - 1)}
+                disabled={pagina === 1 || carregando}
               >
                 ← Anterior
               </button>
               <span className="pag-info">
-                Página {paginaAtual} de {totalPaginas}
-                <span className="pag-total"> ({vendasFiltradas.length} vendas)</span>
+                Página {pagina} de {totalPaginas}
+                <span className="pag-total"> ({totalElementos} vendas)</span>
               </span>
               <button
                 className="btn-secundario btn-pag"
-                onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
-                disabled={paginaAtual === totalPaginas}
+                onClick={() => carregarVendas(pagina + 1)}
+                disabled={pagina === totalPaginas || carregando}
               >
                 Próxima →
               </button>
