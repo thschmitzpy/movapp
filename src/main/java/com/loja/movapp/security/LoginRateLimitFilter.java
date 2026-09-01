@@ -17,6 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Set;
 
 @Component
 @Order(1)
@@ -26,6 +27,12 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
 
     private static final int MAX_TENTATIVAS = 20;
     private static final Duration JANELA = Duration.ofMinutes(1);
+
+    private static final Set<String> URIS_LIMITADAS = Set.of(
+            "/auth/login",
+            "/auth/forgot-password",
+            "/auth/reset-password"
+    );
 
 
     private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
@@ -44,22 +51,22 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
 
-        if (!"/auth/login".equals(request.getRequestURI()) || !"POST".equals(request.getMethod())) {
+        if (!URIS_LIMITADAS.contains(request.getRequestURI()) || !"POST".equals(request.getMethod())) {
             chain.doFilter(request, response);
             return;
         }
 
         String ip = extrairIpCliente(request);
-        Bucket bucket = buckets.get(ip, k -> criarBucket());
+        Bucket bucket = buckets.get(ip + "|" + request.getRequestURI(), k -> criarBucket());
 
         if (bucket.tryConsume(1)) {
             chain.doFilter(request, response);
         } else {
-            log.warn("Rate limit excedido no login: ip={}", ip);
+            log.warn("Rate limit excedido: ip={}, uri={}", ip, request.getRequestURI());
             response.setStatus(429);
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write(
-                    "{\"status\":429,\"mensagem\":\"Muitas tentativas de login. Tente novamente em 1 minuto.\",\"caminho\":\"/auth/login\"}"
+                    "{\"status\":429,\"mensagem\":\"Muitas tentativas. Tente novamente em 1 minuto.\",\"caminho\":\"" + request.getRequestURI() + "\"}"
             );
         }
     }

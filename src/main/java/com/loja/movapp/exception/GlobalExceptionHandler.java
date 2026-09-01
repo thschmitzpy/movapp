@@ -159,14 +159,13 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-     public ResponseEntity<ErroResponse> handleAcesoNegado (
-             AccessDeniedException ex, HttpServletRequest request) {
-        log.warn("Acesso Negado [{}]: {}", request.getRequestURI(), ex.getMessage());
+    public ResponseEntity<ErroResponse> handleAcessoNegado(
+            AccessDeniedException ex, HttpServletRequest request) {
+        log.warn("Acesso negado [{}]: {}", request.getRequestURI(), ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(new ErroResponse(HttpStatus.FORBIDDEN.value(),
-                        "Voce não tem permissão para acessar esse recurso.",
+                        "Você não tem permissão para acessar esse recurso.",
                         request.getRequestURI()));
-
     }
 
     @ExceptionHandler(AuthenticationException.class)

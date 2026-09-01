@@ -40,6 +40,8 @@ import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.AuthenticationException;
+import java.util.LinkedHashMap;
+import org.springframework.beans.factory.annotation.Value;
 
 @RestController
 @RequestMapping("/auth")
@@ -68,6 +70,9 @@ public class AuthController {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Value("${app.demo.expose-reset-token:false}")
+    private boolean demoExpoeTokenNoBody;
 
     @PostMapping("/login")
     @Operation(summary = "Login", description = "Retorna um token JWT válido por 24h")
@@ -150,24 +155,24 @@ public class AuthController {
 
         meterRegistry.counter("auth.forgot_password.total", "existe", String.valueOf(existe)).increment();
 
-        if (!existe) {
+        String token = null;
+        if (existe) {
+            token = resetTokenStore.gerar(username);
+            log.info("Token de reset gerado para username={}", username);
+        } else {
             log.info("Solicitação de reset para usuário inexistente: {}", username);
-
-            return ResponseEntity.ok(Map.of(
-                    "mensagem", "Se o usuário existir, um token de redefinição foi gerado.",
-                    "aviso", "Modo demo: nenhum e-mail é enviado."
-            ));
         }
 
-        String token = resetTokenStore.gerar(username);
-        log.info("Token de reset gerado para username={}", username);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("mensagem", "Se o usuário existir, um token de redefinição foi gerado.");
+        body.put("aviso", "Modo demo: em produção o token seria enviado por e-mail.");
 
-        return ResponseEntity.ok(Map.of(
-                "mensagem", "Token gerado com sucesso.",
-                "aviso", "Modo demo: em produção este token seria enviado por e-mail.",
-                "token", token,
-                "expiraEmMinutos", (int) PasswordResetTokenStore.TTL.toMinutes()
-        ));
+        if (token != null && demoExpoeTokenNoBody) {
+            body.put("token", token);
+            body.put("expiraEmMinutos", (int) PasswordResetTokenStore.TTL.toMinutes());
+        }
+
+        return ResponseEntity.ok(body);
     }
 
     @PostMapping("/reset-password")
@@ -188,7 +193,7 @@ public class AuthController {
             meterRegistry.counter("auth.reset_password.total", "resultado", "usuario_removido").increment();
             log.warn("Reset com token válido mas usuário inexistente: username={}", username);
             return ResponseEntity.status(400)
-                    .body(new ErroResponse(400, "Usuário não encontrado", "/auth/reset-password"));
+                    .body(new ErroResponse(400, "Token inválido ou expirado", "/auth/reset-password"));
         }
 
         meterRegistry.counter("auth.reset_password.total", "resultado", "sucesso").increment();
