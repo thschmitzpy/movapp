@@ -21,12 +21,18 @@ import com.loja.movapp.exception.EstoqueInsuficienteException;
 import com.loja.movapp.exception.RecursoNaoEncontradoException;
 import com.loja.movapp.exception.ErroResponse;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import com.loja.movapp.exception.EstadoInconsistenteException;
 
 
 @Service
 public class IdempotencyService {
 
+
     private static final Logger log = LoggerFactory.getLogger(IdempotencyService.class);
+
+    private static final Duration JANELA_PROCESSAMENTO_ATIVO = Duration.ofSeconds(30);
 
     @Autowired
     private IdempotencyKeyStore store;
@@ -118,6 +124,18 @@ public class IdempotencyService {
         }
 
         if (ik.getStatus() == IdempotencyStatus.PROCESSANDO) {
+            Duration idade = Duration.between(ik.getCriadoEm(), LocalDateTime.now());
+            if (idade.compareTo(JANELA_PROCESSAMENTO_ATIVO) > 0) {
+                meterRegistry.counter("idempotency.orfa.total", "endpoint", endpoint).increment();
+                log.error("Chave '{}' em PROCESSANDO há {}s — órfã (persistência do resultado falhou). " +
+                                "Operação original pode ter sido comitada; investigação manual necessária.",
+                        chave, idade.toSeconds());
+                throw new EstadoInconsistenteException(
+                        "Estado inconsistente para Idempotency-Key '" + chave + "'. " +
+                                "A operação original pode ter sido concluída no servidor mas o resultado " +
+                                "não foi armazenado. NÃO retente com a mesma chave — verifique o histórico " +
+                                "de vendas antes de repetir a operação.");
+            }
             throw new OperacaoNaoPermitidaException(
                     "Requisição com Idempotency-Key '" + chave + "' ainda está em processamento. " +
                             "Aguarde alguns instantes e tente novamente.");

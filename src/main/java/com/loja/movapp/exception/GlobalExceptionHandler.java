@@ -50,6 +50,17 @@ public class GlobalExceptionHandler {
                 .body(new ErroResponse(HttpStatus.CONFLICT.value(), ex.getMessage(), request.getRequestURI()));
     }
 
+    @ExceptionHandler(EstadoInconsistenteException.class)
+    public ResponseEntity<ErroResponse> handleEstadoInconsistente(
+            EstadoInconsistenteException ex, HttpServletRequest request) {
+
+        log.error("Estado inconsistente [{}]: {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .header("X-Idempotency-Orphan", "true")
+                .body(new ErroResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                        ex.getMessage(), request.getRequestURI()));
+    }
+
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     public ResponseEntity<ErroResponse> handleConflitoConcorrencia(
             ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
