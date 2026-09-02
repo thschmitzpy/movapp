@@ -107,15 +107,21 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
   }, []);
 
   const alterarQuantidadeItem = useCallback((codigo, novaQtd) => {
-    const qtd = parseInt(novaQtd);
-    if (!qtd || qtd < 1) return;
-    const item = itens.find(i => i.codigoProduto === codigo);
-    if (item?.estoque != null && qtd > item.estoque) {
-      exibirMensagem(`Estoque insuficiente. Máximo disponível: ${item.estoque}`, 'erro');
-      return;
-    }
-    setItens(itens.map(i => i.codigoProduto === codigo ? { ...i, quantidade: qtd } : i));
-  }, [itens]);
+      const qtd = parseInt(novaQtd, 10);
+      if (!qtd || qtd < 1) return;
+      let estoqueInsuficiente = null;
+      setItens(prev => {
+        const item = prev.find(i => i.codigoProduto === codigo);
+        if (item?.estoque != null && qtd > item.estoque) {
+          estoqueInsuficiente = item.estoque;
+          return prev;
+        }
+        return prev.map(i => i.codigoProduto === codigo ? { ...i, quantidade: qtd } : i);
+      });
+      if (estoqueInsuficiente != null) {
+        exibirMensagem(`Estoque insuficiente. Máximo disponível: ${estoqueInsuficiente}`, 'erro');
+      }
+    }, []);
 
   const total = itens.reduce((acc, i) => acc + i.preco * i.quantidade, 0);
 
@@ -166,28 +172,23 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
       })),
       status: statusVenda,
     };
-    if (!vendaEditando) {
-        const assinatura = JSON.stringify(body);
-        if (!idempotencyKeyRef.current || ultimaAssinaturaRef.current !== assinatura) {
-          idempotencyKeyRef.current = novaIdempotencyKey();
-        }
-        ultimaAssinaturaRef.current = assinatura;
-      }
+    const assinatura = JSON.stringify(body);
+    if (!idempotencyKeyRef.current || ultimaAssinaturaRef.current !== assinatura) {
+      idempotencyKeyRef.current = novaIdempotencyKey();
+    }
+    ultimaAssinaturaRef.current = assinatura;
+
+    const config = { headers: { 'Idempotency-Key': idempotencyKeyRef.current } };
 
     try {
       if (vendaEditando) {
-        await api.put(`/vendas/${vendaEditando.id}`, body);
+        await api.put(`/vendas/${vendaEditando.id}`, body, config);
         exibirMensagem(statusVenda === 'FECHADA'
           ? `Venda #${vendaEditando.id} finalizada com sucesso!`
           : `Venda #${vendaEditando.id} atualizada e mantida como pendente.`
         );
       } else {
-        if (!idempotencyKeyRef.current) {
-          idempotencyKeyRef.current = novaIdempotencyKey();
-        }
-        await api.post('/vendas', body, {
-          headers: { 'Idempotency-Key': idempotencyKeyRef.current },
-        });
+        await api.post('/vendas', body, config);
         exibirMensagem('Venda realizada com sucesso!');
       }
       idempotencyKeyRef.current = null;
