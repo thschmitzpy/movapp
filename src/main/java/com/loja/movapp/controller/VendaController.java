@@ -20,6 +20,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 
 import java.net.URI;
 import java.time.LocalDate;
@@ -117,6 +119,7 @@ public class VendaController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data,
             @Parameter(description = "Status: FECHADA | PENDENTE | CANCELADA")
             @RequestParam(required = false) StatusVenda status,
+            @PageableDefault(size = 20, sort = "data", direction = Sort.Direction.DESC)
             Pageable pageable) {
         return ResponseEntity.ok(service.buscarPorFiltros(id, data, status, pageable));
     }

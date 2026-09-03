@@ -15,6 +15,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -60,6 +62,7 @@ public class ProdutoController {
             @RequestParam(required = false) BigDecimal precoMax,
             @Parameter(description = "Filtrar por ativo. Sem parâmetro = só ativos.")
             @RequestParam(required = false) Boolean ativo,
+            @PageableDefault(size = 20, sort = "codigo", direction = Sort.Direction.ASC)
             Pageable pageable) {
         return ResponseEntity.ok(service.buscar(nome, precoMin, precoMax, ativo, pageable));
     }

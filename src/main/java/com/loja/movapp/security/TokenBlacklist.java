@@ -35,14 +35,9 @@ public class TokenBlacklist {
     }
 
     public boolean isBlacklisted(String token) {
-        if (naoBlacklistados.getIfPresent(token) != null) {
-            return false;
-        }
-        boolean blacklisted = repository.existsById(token);
-        if (!blacklisted) {
-            naoBlacklistados.put(token, Boolean.TRUE);
-        }
-        return blacklisted;
+        Boolean naoBlacklistado = naoBlacklistados.get(token,
+                k -> repository.existsById(k) ? null : Boolean.TRUE);
+        return naoBlacklistado == null;
     }
 
     @Scheduled(fixedRate = 3_600_000)
