@@ -12,7 +12,6 @@ BEGIN
             ('TEN-001', 'Tênis Casual',      'Branco', '40',   259.90,  10, TRUE, 0),
             ('MEI-001', 'Meia Esportiva',    'Cinza',  'Único', 19.90,  60, TRUE, 0);
 
-        -- Venda 1: hoje, fechada, dinheiro, 1 item
         WITH nova_venda AS (
             INSERT INTO vendas (data, total, forma_pagamento, condicao_pagamento, status, usuario, versao)
             VALUES (CURRENT_TIMESTAMP - INTERVAL '1 hour', 49.90, 'DINHEIRO', 'A_VISTA', 'FECHADA', 'admin', 0)
@@ -24,7 +23,6 @@ BEGIN
         INSERT INTO pagamentos_venda (venda_id, forma_pagamento, condicao_pagamento, valor)
         SELECT id, 'DINHEIRO', 'A_VISTA', 49.90 FROM nova_venda;
 
-        -- Venda 2: hoje, fechada, cartão, 2 itens
         WITH nova_venda AS (
             INSERT INTO vendas (data, total, forma_pagamento, condicao_pagamento, status, usuario, versao)
             VALUES (CURRENT_TIMESTAMP - INTERVAL '3 hours', 229.80, 'CARTAO_CREDITO', '3X', 'FECHADA', 'admin', 0)

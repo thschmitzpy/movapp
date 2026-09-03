@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -464,11 +465,18 @@ public class VendaService {
     @Transactional(readOnly = true)
     public Page<VendaResponseDTO> buscarPorFiltros(Long id, LocalDate data, StatusVenda status, Pageable pageable) {
         if (id != null) {
-            return vendaRepository.findById(id)
+            Venda venda = vendaRepository.findById(id)
                     .filter(v -> data == null || ehDoDia(v.getData(), data))
                     .filter(v -> status == null || v.getStatus() == status)
-                    .map(v -> (Page<VendaResponseDTO>) new PageImpl<>(List.of(toDTO(v)), pageable, 1))
-                    .orElse(Page.empty(pageable));
+                    .orElse(null);
+            if (venda == null) {
+                return Page.empty(pageable);
+            }
+            if (pageable.getPageNumber() > 0) {
+                return new PageImpl<>(List.of(), pageable, 1);
+            }
+            Pageable primeira = PageRequest.of(0, pageable.getPageSize(), pageable.getSort());
+            return new PageImpl<>(List.of(toDTO(venda)), primeira, 1);
         }
         LocalDateTime inicio = data != null ? data.atStartOfDay() : null;
         LocalDateTime fim    = data != null ? data.plusDays(1).atStartOfDay() : null;
