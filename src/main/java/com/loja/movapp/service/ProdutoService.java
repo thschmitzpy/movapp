@@ -12,9 +12,11 @@ import java.math.BigDecimal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -31,6 +33,22 @@ public class ProdutoService {
 
     @Autowired
     private ProdutoRepository repository;
+
+    @Autowired
+    private CacheManager cacheManager;
+
+    private void agendarEvictProduto(String codigo) {
+        if (codigo == null || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                Cache cache = cacheManager.getCache("produtos");
+                if (cache != null) cache.evict(codigo);
+            }
+        });
+    }
 
     private Produto toEntity(ProdutoCreateRequestDTO dto) {
         Produto p = new Produto();
@@ -51,7 +69,6 @@ public class ProdutoService {
     }
 
     @Transactional
-    @CachePut(value = "produtos", key = "#result.codigo")
     public ProdutoResponseDTO salvar(ProdutoCreateRequestDTO dto) {
         if (repository.existsById(dto.getCodigo())) {
             log.warn("Cadastro bloqueado: código '{}' já existe", dto.getCodigo());
@@ -60,6 +77,7 @@ public class ProdutoService {
         }
         log.info("Cadastrando produto: codigo={}, nome={}", dto.getCodigo(), dto.getNome());
         ProdutoResponseDTO salvo = toDTO(repository.save(toEntity(dto)));
+        agendarEvictProduto(salvo.getCodigo());
         log.info("Produto cadastrado com sucesso: codigo={}", salvo.getCodigo());
         return salvo;
     }
@@ -104,7 +122,6 @@ public class ProdutoService {
     }
 
     @Transactional
-    @CacheEvict(value = "produtos", key = "#codigo")
     public void excluir(String codigo) {
         Produto p = repository.findById(codigo)
                 .orElseThrow(() -> {
@@ -128,6 +145,7 @@ public class ProdutoService {
 
         p.setAtivo(false);
         repository.save(p);
+        agendarEvictProduto(codigo);
         log.info("Produto inativado: codigo={}", codigo);
     }
 
@@ -137,7 +155,6 @@ public class ProdutoService {
             backoff = @Backoff(delay = 50, multiplier = 2, random = true)
     )
     @Transactional
-    @CachePut(value = "produtos", key = "#codigo")
     public ProdutoResponseDTO editar(String codigo, ProdutoRequestDTO dto) {
         Produto p = repository.findById(codigo)
                 .orElseThrow(() -> {
@@ -161,6 +178,7 @@ public class ProdutoService {
         if (dto.getEstoque() != null) p.setEstoque(dto.getEstoque());
 
         ProdutoResponseDTO atualizado = toDTO(repository.save(p));
+        agendarEvictProduto(codigo);
         log.info("Produto atualizado: codigo={}", codigo);
         return atualizado;
     }
@@ -171,7 +189,6 @@ public class ProdutoService {
             backoff = @Backoff(delay = 50, multiplier = 2, random = true)
     )
     @Transactional
-    @CachePut(value = "produtos", key = "#codigo")
     public ProdutoResponseDTO reativar(String codigo) {
         Produto p = repository.findById(codigo)
                 .orElseThrow(() -> {
@@ -188,6 +205,7 @@ public class ProdutoService {
 
         p.setAtivo(true);
         ProdutoResponseDTO reativado = toDTO(repository.save(p));
+        agendarEvictProduto(codigo);
         log.info("Produto reativado: codigo={}", codigo);
         return reativado;
     }

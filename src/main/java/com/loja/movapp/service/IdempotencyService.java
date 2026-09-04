@@ -44,28 +44,28 @@ public class IdempotencyService {
     private MeterRegistry meterRegistry;
 
     public <T> T executar(String chave, String endpoint, Object requestPayload,
-                          Supplier<T> acao, Class<T> tipoResposta) {
+                          Supplier<T> acao, Class<T> tipoResposta, int statusHttp) {
         if (chave == null || chave.isBlank()) {
             return acao.get();
         }
 
         String hash = sha256(toJson(requestPayload));
-        return executarComChave(chave, endpoint, hash, acao, tipoResposta, true);
+        return executarComChave(chave, endpoint, hash, acao, tipoResposta, statusHttp, true);
     }
 
     private <T> T executarComChave(String chave, String endpoint, String hash,
                                    Supplier<T> acao, Class<T> tipoResposta,
-                                   boolean permitirReivindicarOrfa) {
+                                   int statusHttp, boolean permitirReivindicarOrfa) {
 
         Optional<IdempotencyKey> reivindicada = store.tentarReivindicar(chave, endpoint, hash);
         if (reivindicada.isPresent()) {
-            return executarAcao(chave, endpoint, acao);
+            return executarAcao(chave, endpoint, acao, statusHttp);
         }
 
-        return tratarChaveExistente(chave, endpoint, hash, acao, tipoResposta, permitirReivindicarOrfa);
+        return tratarChaveExistente(chave, endpoint, hash, acao, tipoResposta, statusHttp, permitirReivindicarOrfa);
     }
 
-    private <T> T executarAcao(String chave, String endpoint, Supplier<T> acao) {
+    private <T> T executarAcao(String chave, String endpoint, Supplier<T> acao, int statusHttp) {
         T resultado;
         try {
             resultado = acao.get();
@@ -89,7 +89,7 @@ public class IdempotencyService {
         }
 
         try {
-            store.concluir(chave, 200, toJson(resultado));
+            store.concluir(chave, statusHttp, toJson(resultado));
             log.info("Idempotência registrada: chave='{}', endpoint='{}'", chave, endpoint);
         } catch (RuntimeException persistEx) {
             log.error("Falha ao cachear resposta da chave '{}' após venda comitada. " +
@@ -106,12 +106,12 @@ public class IdempotencyService {
 
     private <T> T tratarChaveExistente(String chave, String endpoint, String hashAtual,
                                        Supplier<T> acao, Class<T> tipoResposta,
-                                       boolean permitirReivindicarOrfa) {
+                                       int statusHttp, boolean permitirReivindicarOrfa) {
         IdempotencyKey ik = store.buscar(chave).orElse(null);
         if (ik == null) {
 
             if (permitirReivindicarOrfa) {
-                return executarComChave(chave, endpoint, hashAtual, acao, tipoResposta, false);
+                return executarComChave(chave, endpoint, hashAtual, acao, tipoResposta, statusHttp, false);
             }
             throw new OperacaoNaoPermitidaException(
                     "Estado inconsistente para Idempotency-Key '" + chave + "'. Tente novamente.");

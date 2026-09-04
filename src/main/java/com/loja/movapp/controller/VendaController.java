@@ -74,7 +74,8 @@ public class VendaController {
                 "POST /vendas",
                 dto,
                 () -> service.realizarVenda(dto, userDetails.getUsername()),
-                VendaResponseDTO.class);
+                VendaResponseDTO.class,
+                201);
         return ResponseEntity
                 .created(URI.create("/vendas/" + resposta.getId()))
                 .body(resposta);
@@ -103,7 +104,8 @@ public class VendaController {
                 "PUT /vendas/" + id,
                 dto,
                 () -> service.atualizarVenda(id, dto, userDetails.getUsername()),
-                VendaResponseDTO.class);
+                VendaResponseDTO.class,
+                200);
         return ResponseEntity.ok(resposta);
     }
 

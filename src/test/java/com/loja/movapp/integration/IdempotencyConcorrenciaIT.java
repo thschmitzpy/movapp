@@ -172,7 +172,8 @@ class IdempotencyConcorrenciaIT extends AbstractPostgresIT {
                 "POST /vendas",
                 dto,
                 () -> vendaService.realizarVenda(dto, "teste"),
-                VendaResponseDTO.class);
+                VendaResponseDTO.class,
+                201);
     }
 
     private VendaRequestDTO montarVenda(int qtd) {
