@@ -42,6 +42,12 @@ public class Venda {
     @Column(name = "usuario")
     private String usuario;
 
+    @Column(name = "alterado_por")
+    private String alteradoPor;
+
+    @Column(name = "alterado_em")
+    private LocalDateTime alteradoEm;
+
     @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true)
     @BatchSize(size = 50)
     private List<ItemVenda> itens = new ArrayList<>();
@@ -67,6 +73,10 @@ public class Venda {
     public void setStatus(StatusVenda status)           { this.status            = status;            }
     public String getUsuario()                          { return usuario;                             }
     public void setUsuario(String usuario)              { this.usuario           = usuario;           }
+    public String getAlteradoPor()                      { return alteradoPor;                         }
+    public void setAlteradoPor(String alteradoPor)      { this.alteradoPor       = alteradoPor;       }
+    public LocalDateTime getAlteradoEm()                { return alteradoEm;                          }
+    public void setAlteradoEm(LocalDateTime alteradoEm) { this.alteradoEm        = alteradoEm;        }
     public void setItens(List<ItemVenda> itens)         { this.itens             = itens;             }
     public void setPagamentos(List<PagamentoVenda> pagamentos) { this.pagamentos  = pagamentos;       }
 }

@@ -17,6 +17,8 @@ public class VendaResponseDTO {
     private String condicaoPagamento;
     private StatusVenda status;
     private String usuario;
+    private String alteradoPor;
+    private LocalDateTime alteradoEm;
     private List<ItemVendaResponseDTO> itens;
     private List<PagamentoVendaResponseDTO> pagamentos;
 
@@ -24,6 +26,7 @@ public class VendaResponseDTO {
     public VendaResponseDTO(Long id, LocalDateTime data, BigDecimal total,
                             String formaPagamento, String condicaoPagamento,
                             StatusVenda status, String usuario,
+                            String alteradoPor, LocalDateTime alteradoEm,
                             List<ItemVendaResponseDTO> itens,
                             List<PagamentoVendaResponseDTO> pagamentos) {
         this.id                = id;
@@ -33,6 +36,8 @@ public class VendaResponseDTO {
         this.condicaoPagamento = condicaoPagamento;
         this.status            = status;
         this.usuario           = usuario;
+        this.alteradoPor       = alteradoPor;
+        this.alteradoEm        = alteradoEm;
         this.itens             = itens;
         this.pagamentos        = pagamentos;
     }
@@ -44,6 +49,8 @@ public class VendaResponseDTO {
     public String getCondicaoPagamento()                 { return condicaoPagamento; }
     public StatusVenda getStatus()                       { return status;            }
     public String getUsuario()                           { return usuario;           }
+    public String getAlteradoPor()                       { return alteradoPor;       }
+    public LocalDateTime getAlteradoEm()                 { return alteradoEm;        }
     public List<ItemVendaResponseDTO> getItens()         { return itens;             }
     public List<PagamentoVendaResponseDTO> getPagamentos() { return pagamentos;      }
 }

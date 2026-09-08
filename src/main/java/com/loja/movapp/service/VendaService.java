@@ -293,6 +293,8 @@ public class VendaService {
 
         venda.setTotal(total);
         venda.setStatus(dto.getStatus());
+        venda.setAlteradoPor(usuario);
+        venda.setAlteradoEm(LocalDateTime.now());
 
         Venda vendaSalva = vendaRepository.save(venda);
 
@@ -342,6 +344,8 @@ public class VendaService {
         }
 
         venda.setStatus(StatusVenda.CANCELADA);
+        venda.setAlteradoPor(usuario);
+        venda.setAlteradoEm(LocalDateTime.now());
         vendaRepository.save(venda);
 
         agendarEvictDeProdutos(codigosComEstoqueAlterado);
@@ -436,7 +440,9 @@ public class VendaService {
         return new VendaResponseDTO(
                 v.getId(), v.getData(), v.getTotal(),
                 v.getFormaPagamento(), v.getCondicaoPagamento(),
-                v.getStatus(), v.getUsuario(), itens, mapPagamentos(v));
+                v.getStatus(), v.getUsuario(),
+                v.getAlteradoPor(), v.getAlteradoEm(),
+                itens, mapPagamentos(v));
     }
 
     private VendaResponseDTO toDTO(Venda v) {
@@ -449,7 +455,9 @@ public class VendaService {
         return new VendaResponseDTO(
                 v.getId(), v.getData(), v.getTotal(),
                 v.getFormaPagamento(), v.getCondicaoPagamento(),
-                v.getStatus(), v.getUsuario(), itens, mapPagamentos(v));
+                v.getStatus(), v.getUsuario(),
+                v.getAlteradoPor(), v.getAlteradoEm(),
+                itens, mapPagamentos(v));
     }
 
     private List<PagamentoVendaResponseDTO> mapPagamentos(Venda v) {
