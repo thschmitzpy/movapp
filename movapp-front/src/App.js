@@ -48,12 +48,15 @@ import { useState, useEffect, useRef } from 'react';
     }
 
     async function handleLogout() {
-      try { await api.post('/auth/logout'); } catch {}
-      localStorage.removeItem('token');
-      localStorage.removeItem('usuario');
-      setLogado(false);
-      setUsuario(null);
-    }
+        try { await api.post('/auth/logout'); } catch {}
+        localStorage.removeItem('token');
+        localStorage.removeItem('usuario');
+        sessaoExpirada.current = false;
+        setAbaAtiva('cadastro');
+        setDataFiltro('');
+        setLogado(false);
+        setUsuario(null);
+      }
 
     if (!logado) {
       return <Autenticacao onLogin={handleLogin} />;

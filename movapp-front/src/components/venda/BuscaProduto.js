@@ -8,22 +8,23 @@ export default function BuscaProduto({ itens, onAdicionarItem, exibirMensagem })
   const [buscando, setBuscando] = useState(false);
 
   async function buscarProduto() {
-    if (!codigoBusca.trim()) return;
-    setBuscando(true);
-    try {
-      const res = await api.get(`/produtos/${codigoBusca.trim()}`);
-      setProdutoBuscado(res.data);
-    } catch (err) {
-      setProdutoBuscado(null);
-      const status = err.response?.status;
+      const codigo = codigoBusca.trim();
+      if (!codigo) return;
+      setBuscando(true);
+      try {
+        const res = await api.get(`/produtos/${encodeURIComponent(codigo)}`);
+        setProdutoBuscado(res.data);
+      } catch (err) {
+        setProdutoBuscado(null);
+        const status = err.response?.status;
 
-      if (status === 404) {
-        exibirMensagem(`Produto "${codigoBusca}" não encontrado.`, 'erro');
+        if (status === 404) {
+          exibirMensagem(`Produto "${codigo}" não encontrado.`, 'erro');
+        }
+      } finally {
+        setBuscando(false);
       }
-    } finally {
-      setBuscando(false);
     }
-  }
 
   function adicionarItem() {
     if (!produtoBuscado) return;

@@ -91,7 +91,7 @@ export default function CadastroProduto({ isAdmin = false }) {
     };
     try {
       if (editando) {
-        await api.patch(`/produtos/${editando}`, body);
+        await api.patch(`/produtos/${encodeURIComponent(editando)}`, body);
         exibirMensagem('Produto atualizado com sucesso!');
       } else {
         await api.post('/produtos', body);
@@ -112,7 +112,7 @@ export default function CadastroProduto({ isAdmin = false }) {
     const produto = confirmarExclusao;
     setConfirmarExclusao(null);
     try {
-      await api.delete(`/produtos/${produto.codigo}`);
+      await api.delete(`/produtos/${encodeURIComponent(produto.codigo)}`);
       exibirMensagem(`Produto "${produto.nome}" excluído.`);
       carregarProdutos(busca, pagina);
     } catch (err) {
