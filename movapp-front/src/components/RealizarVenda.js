@@ -28,7 +28,7 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
     setTimeout(() => setMensagem(null), 4000);
   }
 
-  const iniciarEdicao = useCallback((venda) => {
+  const iniciarEdicao = useCallback(async (venda) => {
 
       const temTrabalhoNaoSalvo = itens.length > 0 && vendaEditando?.id !== venda.id;
       if (temTrabalhoNaoSalvo) {
@@ -39,12 +39,25 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
       }
 
       setVendaEditando(venda);
-      setItens(venda.itens.map(i => ({
-        codigoProduto: i.codigoProduto,
-        nomeProduto: i.nomeProduto,
-        preco: i.precoUnit,
-        quantidade: i.quantidade,
-      })));
+
+      const produtosAtuais = await Promise.all(
+        venda.itens.map(i =>
+          api.get(`/produtos/${encodeURIComponent(i.codigoProduto)}`)
+            .then(r => r.data)
+            .catch(() => null)
+        )
+      );
+
+      setItens(venda.itens.map((i, idx) => {
+        const atual = produtosAtuais[idx];
+        return {
+          codigoProduto: i.codigoProduto,
+          nomeProduto: atual?.nome ?? i.nomeProduto,
+          preco: atual?.preco ?? i.precoUnit,
+          quantidade: i.quantidade,
+          estoque: atual?.estoque ?? null,
+        };
+      }));
       const pagsBackend = venda.pagamentos?.length
         ? venda.pagamentos.map(p => ({
             uid: novoUid(),
@@ -107,21 +120,15 @@ export default function RealizarVenda({ onVendaAtualizada, dataFiltro, onDataFil
   }, []);
 
   const alterarQuantidadeItem = useCallback((codigo, novaQtd) => {
-      const qtd = parseInt(novaQtd, 10);
-      if (!qtd || qtd < 1) return;
-      let estoqueInsuficiente = null;
-      setItens(prev => {
-        const item = prev.find(i => i.codigoProduto === codigo);
+        const qtd = parseInt(novaQtd, 10);
+        if (!qtd || qtd < 1) return;
+        const item = itens.find(i => i.codigoProduto === codigo);
         if (item?.estoque != null && qtd > item.estoque) {
-          estoqueInsuficiente = item.estoque;
-          return prev;
+          exibirMensagem(`Estoque insuficiente. Máximo disponível: ${item.estoque}`, 'erro');
+          return;
         }
-        return prev.map(i => i.codigoProduto === codigo ? { ...i, quantidade: qtd } : i);
-      });
-      if (estoqueInsuficiente != null) {
-        exibirMensagem(`Estoque insuficiente. Máximo disponível: ${estoqueInsuficiente}`, 'erro');
-      }
-    }, []);
+        setItens(prev => prev.map(i => i.codigoProduto === codigo ? { ...i, quantidade: qtd } : i));
+      }, [itens]);
 
   const total = itens.reduce((acc, i) => acc + i.preco * i.quantidade, 0);
 
