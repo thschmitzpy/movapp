@@ -72,11 +72,6 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     }
 
     private String extrairIpCliente(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            int virgula = xff.indexOf(',');
-            return (virgula > 0 ? xff.substring(0, virgula) : xff).trim();
-        }
         String remote = request.getRemoteAddr();
         return (remote != null && !remote.isBlank()) ? remote : "desconhecido";
     }

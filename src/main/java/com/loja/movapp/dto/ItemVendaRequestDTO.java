@@ -5,10 +5,10 @@ import jakarta.validation.constraints.NotBlank;
 
 public class ItemVendaRequestDTO {
 
-    @NotBlank(message = "Codigo no produto é obrigatório")
+    @NotBlank(message = "Código do produto é obrigatório")
     private String codigoProduto;
 
-    @Min( value = 1, message = "Quantidade minima é 1")
+    @Min(value = 1, message = "Quantidade mínima é 1")
     private int quantidade;
 
     public String getCodigoProduto() {return codigoProduto; }
